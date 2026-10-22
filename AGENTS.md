@@ -41,7 +41,8 @@ real-flight/
 ├── src/
 │   ├── server/        Bun on the Mac: serves the cockpit, relays drone UDP ⇄ WebSocket
 │   │   └── drones/    one adapter per drone model (Tello first); the rest of the code is drone-agnostic
-│   └── cockpit/       Quest 3 browser app: WebXR view, WebCodecs decode, HUD, lock-on, Touch controller input, recording
+│   ├── cockpit/       Quest 3 browser app: WebXR view, WebCodecs decode, HUD, lock-on, Touch controller input, recording
+│   └── shared/        code both sides use: the WebSocket protocol, H.264 framing, target ids
 └── docs/
     ├── prd/           per-feature requirements and design (structure in prd/README.md)
     └── adr/           hard-to-reverse decisions (structure in adr/README.md)
@@ -54,6 +55,9 @@ Tools are managed with mise.
 ```bash
 mise install   # install tools pinned in mise.toml
 bun install
+bun run dev    # cockpit with the simulated drone (DRONE=tello for the real one)
+bun test       # unit tests
+bun run typecheck
 ```
 
 The Quest 3 reaches the Mac over USB: `adb reverse tcp:<port> tcp:<port>`, then open `http://localhost:<port>` in the Quest browser. The Mac joins the Tello's Wi-Fi; the Quest stays off it.

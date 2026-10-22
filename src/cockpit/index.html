@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>REAL FLIGHT Cockpit</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        background: #000;
+        color: #7dff9a;
+        font: 14px ui-monospace, Menlo, monospace;
+      }
+      body {
+        display: grid;
+        place-items: center;
+      }
+      #view {
+        max-width: 100vw;
+        max-height: 100vh;
+        aspect-ratio: 4 / 3;
+      }
+      #help {
+        position: fixed;
+        left: 12px;
+        bottom: 12px;
+        max-width: calc(50vw - 100px);
+        font-size: 12px;
+        opacity: 0.7;
+      }
+      #error {
+        position: fixed;
+        top: 12px;
+        left: 50%;
+        transform: translateX(-50%);
+        color: #ff5a5a;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="view" width="960" height="720"></canvas>
+    <div id="help">
+      Keys: W/S up-down · A/D yaw · arrows forward/back/left/right · T take off · L land · Space emergency
+      <br />Touch: left stick throttle+yaw · right stick pitch+roll · A take off · B land · X emergency
+    </div>
+    <div id="error" role="alert"></div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

@@ -8,11 +8,21 @@
 
 ## QuickStart
 
-Mac、Tello、開発者モードを有効にした Quest 3、`adb` が必要。
+Mac が必要。Bun・ffmpeg・`adb` は `mise install` で入る。
 
 ```bash
 mise install
 bun install
+bun run dev                  # シミュレーターの機体で http://localhost:8080 にコックピットを起動
 ```
 
-Mac を Tello の Wi-Fi につなぎ、Quest を USB で接続して `adb reverse` を実行し、Quest のブラウザでコックピットを開く。起動コマンドは最初の機能と一緒に追加する。
+Chrome で `http://localhost:8080` を開く。シミュレーターの機体は、標的のマーカーを置いた平らな世界の上でカメラを飛ばすので、実機なしでコックピット全体を動かせる。キーは `T` 離陸、`W/S` 上昇・下降、`A/D` 旋回、矢印キーで前後左右、`L` 着陸、`Space` 非常停止。WebXR は [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) 拡張で机上で試せる。
+
+実機（Tello と、開発者モードの Quest 3）では次のようにする。
+
+```bash
+DRONE=tello bun run start    # Mac を Tello の Wi-Fi につないだ状態で
+adb reverse tcp:8080 tcp:8080
+```
+
+Quest のブラウザで `http://localhost:8080` を開き、「Enter VR」を押す。出撃は離陸から着陸の数秒後まで録画され、Mac の `recordings/` に保存される。標的は `http://localhost:8080/markers` から印刷する。

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>REAL FLIGHT Targets</title>
+    <style>
+      body {
+        margin: 0;
+        font: 16px system-ui, sans-serif;
+        background: #fff;
+        color: #000;
+      }
+      p {
+        margin: 16px;
+      }
+      figure {
+        margin: 0;
+        padding: 10mm;
+        break-after: page;
+        text-align: center;
+      }
+      figure svg {
+        width: 150mm;
+        height: 150mm;
+      }
+      @media print {
+        p {
+          display: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <p>Print one target per page at 100% scale. Keep the white margin around each marker.</p>
+    <main id="targets"></main>
+    <script type="module" src="./markers.ts"></script>
+  </body>
+</html>
