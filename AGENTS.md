@@ -42,3 +42,7 @@ The Quest 3 reaches the Mac over USB: `adb reverse tcp:<port> tcp:<port>`, then 
 
 - Read `docs/adr/` before changing where decoding, lock-on or recording runs
 - Measured latency and Quest browser quirks go into `.agents/skills/<topic>/` once found
+
+## Review
+
+Pullfrog reviews each PR once automatically; later commits are re-reviewed too. Ask again with `@pullfrog`. Repo-level settings live in [`.github/pullfrog.config.sh`](.github/pullfrog.config.sh).
