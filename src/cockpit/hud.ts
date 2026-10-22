@@ -1,4 +1,5 @@
 import type { DetectedMarker } from "./detector";
+import { enemyBounds } from "./enemy";
 import type { SortieState } from "./sortie";
 
 export type Reticle = { x: number; y: number; radius: number };
@@ -19,7 +20,7 @@ const AMBER = "#ffc857";
 const RED = "#ff5a5a";
 
 function font(px: number, unit: number, weight = 600): string {
-  return `${weight} ${px * unit}px ui-monospace, Menlo, monospace`;
+  return `${weight} ${px * unit}px ui-monospace, Menlo, "Hiragino Sans", monospace`;
 }
 
 export function isInReticle(point: { x: number; y: number }, reticle: Reticle): boolean {
@@ -39,15 +40,15 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   for (const marker of hud.markers) {
     const down = sortie.shotDown.includes(marker.id);
     if (!down && !sortie.remaining.includes(marker.id)) continue;
-    ctx.strokeStyle = down ? RED : AMBER;
-    ctx.beginPath();
-    marker.corners.forEach(({ x, y }, i) => (i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y)));
-    ctx.closePath();
-    ctx.stroke();
-    ctx.fillStyle = ctx.strokeStyle;
-    const top = Math.min(...marker.corners.map((c) => c.y));
-    ctx.fillText(down ? "DOWN" : `TGT ${marker.id}`, marker.center.x - 30 * unit, top - 28 * unit);
+    const box = enemyBounds(marker);
+    ctx.strokeStyle = ctx.fillStyle = down ? RED : AMBER;
+    drawBrackets(ctx, box, 18 * unit);
+    ctx.textAlign = "center";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(down ? "DOWN" : `TGT ${marker.id}`, (box.left + box.right) / 2, box.top - 6 * unit);
   }
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 
   ctx.strokeStyle = sortie.lock ? AMBER : GREEN;
   ctx.beginPath();
@@ -100,14 +101,34 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   ctx.restore();
 }
 
+/** Corner brackets around a target, so the robot itself stays unobstructed. */
+function drawBrackets(
+  ctx: CanvasRenderingContext2D,
+  { left, top, right, bottom }: { left: number; top: number; right: number; bottom: number },
+  arm: number,
+): void {
+  ctx.beginPath();
+  for (const [x, y, dx, dy] of [
+    [left, top, 1, 1],
+    [right, top, -1, 1],
+    [left, bottom, 1, -1],
+    [right, bottom, -1, -1],
+  ] as const) {
+    ctx.moveTo(x + dx * arm, y);
+    ctx.lineTo(x, y);
+    ctx.lineTo(x, y + dy * arm);
+  }
+  ctx.stroke();
+}
+
 function bannerFor(sortie: SortieState): string | null {
   switch (sortie.phase) {
     case "ready":
-      return "READY — TAKE OFF (A / T)";
+      return "A ボタン / T キーで離陸";
     case "complete":
-      return `SORTIE COMPLETE  ${formatTime(sortie.elapsedMs)}`;
+      return `全機撃墜  ${formatTime(sortie.elapsedMs)}`;
     case "landed":
-      return `LANDED  ${sortie.shotDown.length} DOWN  ${formatTime(sortie.elapsedMs)}`;
+      return `着陸  撃墜 ${sortie.shotDown.length}  ${formatTime(sortie.elapsedMs)}`;
     case "flying":
       return null;
   }

@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -11,7 +11,7 @@
         height: 100%;
         background: #000;
         color: #7dff9a;
-        font: 14px ui-monospace, Menlo, monospace;
+        font: 14px ui-monospace, Menlo, "Hiragino Sans", monospace;
       }
       body {
         display: grid;
@@ -42,8 +42,8 @@
   <body>
     <canvas id="view" width="960" height="720"></canvas>
     <div id="help">
-      Keys: W/S up-down · A/D yaw · arrows forward/back/left/right · T take off · L land · Space emergency
-      <br />Touch: left stick throttle+yaw · right stick pitch+roll · A take off · B land · X emergency
+      キー: W/S 上昇・下降 · A/D 旋回 · 矢印 前後左右 · T 離陸 · L 着陸 · Space 非常停止
+      <br />Touch: 左スティック 上昇・下降と旋回 · 右スティック 前後左右 · A 離陸 · B 着陸 · X 非常停止
     </div>
     <div id="error" role="alert"></div>
     <script type="module" src="./main.ts"></script>

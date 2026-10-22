@@ -1,7 +1,8 @@
 import { WS_PATH, type CockpitMessage, type Command, type ServerMessage } from "../shared/protocol";
 import { TARGET_IDS } from "../shared/targets";
 import { Controls } from "./controls";
-import { MarkerDetector, type DetectedMarker } from "./detector";
+import { MarkerDetector } from "./detector";
+import { EnemyLayer } from "./enemy";
 import { drawHud, isInReticle } from "./hud";
 import { SortieRecorder } from "./recorder";
 import { Sortie } from "./sortie";
@@ -22,12 +23,12 @@ const reticle = { x: canvas.width / 2, y: canvas.height / 2, radius: canvas.heig
 
 const sortie = new Sortie(TARGET_IDS);
 const detector = new MarkerDetector(canvas.width, canvas.height);
+const enemies = new EnemyLayer();
 const controls = new Controls();
 const recorder = new SortieRecorder(canvas, (path) => console.info(`recording saved to ${path}`), showError);
 const xr = new XrCockpit(canvas, controlTick, () => runCommand("land"));
 document.body.append(xr.button());
 
-let markers: DetectedMarker[] = [];
 let battery: number | null = null;
 let linkUp = false;
 let framesThisSecond = 0;
@@ -41,12 +42,15 @@ const video = new VideoReceiver((frame) => {
     frame.close();
   }
   errorBox.textContent = "";
-  markers = detector.detect(canvas);
+  const markers = detector.detect(canvas);
   const now = performance.now();
-  sortie.update(now, markers.filter((m) => isInReticle(m.center, reticle)).map((m) => m.id));
+  const shown = enemies.track(markers, now);
+  const shotDown = sortie.update(now, markers.filter((m) => isInReticle(m.center, reticle)).map((m) => m.id));
+  for (const id of shotDown) enemies.explode(id, now);
+  enemies.draw(ctx, shown, sortie.state, now);
   drawHud(ctx, {
     sortie: sortie.state,
-    markers,
+    markers: shown,
     reticle,
     battery,
     recording: recorder.recording,
