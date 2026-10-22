@@ -10,11 +10,12 @@ observation proves depends on where it was made.
 
 ## A tab you cannot see is not evidence
 
-Browsers pause `requestAnimationFrame` and slow timers to about once a second for tabs they consider
-hidden. The cockpit samples the pilot's input and drives the sortie from timers, so in a background
-tab "the keys do nothing" and "control feels laggy" are true of the tab, not of the code. The
-converse rule keeps the code honest: drive input from a timer, never from `requestAnimationFrame`,
-because that is a button that silently stops working while the video keeps playing.
+Browsers pause `requestAnimationFrame` and delay timers for tabs they consider hidden: Chrome drops
+such timers to once a second, and to once a minute for a tab that has been hidden for minutes. The
+cockpit samples the pilot's input and drives the sortie from timers, so in a background tab "the keys
+do nothing" and "control feels laggy" are true of the tab, not of the code. The converse rule keeps
+the code honest: drive input from a timer, never from `requestAnimationFrame`, because that is a
+button that silently stops working while the video keeps playing.
 
 Bring the tab to the foreground before sending keys and before taking a screenshot, and read `?debug`
 in a foreground tab. Never report a conclusion about feel, input, or timing from a hidden window.
