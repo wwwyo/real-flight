@@ -1,0 +1,4 @@
+[install]
+# Pin exact versions and skip releases younger than 7 days (supply-chain cooldown).
+exact = true
+minimumReleaseAge = 604800
