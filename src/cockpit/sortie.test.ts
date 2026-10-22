@@ -57,7 +57,9 @@ describe("Sortie", () => {
     expect(hold(sortie, [1], 0, 2000)).toEqual([]);
 
     sortie.takeoff(3000);
+    hold(sortie, [1], 3000, 3050);
     sortie.land(3100);
+    expect(sortie.state.lock).toBeNull();
     expect(hold(sortie, [1], 3100, 5000)).toEqual([]);
     expect(sortie.state.phase).toBe("landed");
   });

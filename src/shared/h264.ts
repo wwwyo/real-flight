@@ -107,8 +107,10 @@ export class AccessUnitSplitter {
     if (isVcl(type)) this.currentHasVcl = true;
   }
 
+  /** Emits the frame collected so far. NALs without a slice yet (SPS/PPS) stay for the next frame. */
   private emit(done: Uint8Array[]): void {
-    if (this.currentHasVcl) done.push(concat(this.current));
+    if (!this.currentHasVcl) return;
+    done.push(concat(this.current));
     this.current = [];
     this.currentHasVcl = false;
   }

@@ -51,6 +51,7 @@ export class Sortie {
     if (this.phase !== "flying") return;
     this.phase = "landed";
     this.endedAt = now;
+    this.locks.clear();
   }
 
   /** Advances time with the targets seen inside the reticle on this frame; returns ids shot down now. */

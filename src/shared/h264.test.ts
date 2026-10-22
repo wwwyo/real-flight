@@ -37,6 +37,15 @@ describe("AccessUnitSplitter", () => {
     }
   });
 
+  test("keeps SPS/PPS flushed on their own for the frame that follows", () => {
+    const splitter = new AccessUnitSplitter();
+    splitter.push(new Uint8Array([...sps, ...pps]));
+    expect(splitter.flush()).toEqual([]);
+    splitter.push(new Uint8Array(idr));
+    const [unit] = splitter.flush();
+    expect(splitNals(unit!).map(nalType)).toEqual([7, 8, 5]);
+  });
+
   test("holds the last picture until the next one starts or the source flushes", () => {
     const splitter = new AccessUnitSplitter();
     expect(splitter.push(new Uint8Array([...sps, ...pps, ...idr]))).toEqual([]);

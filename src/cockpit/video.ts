@@ -16,14 +16,20 @@ export class VideoReceiver {
   private state: "unconfigured" | "configuring" | "waiting-key" | "decoding" = "unconfigured";
 
   constructor(
-    onFrame: (frame: VideoFrame) => void,
+    private readonly onFrame: (frame: VideoFrame) => void,
     private readonly onError: (error: Error) => void,
   ) {
-    this.decoder = new VideoDecoder({
-      output: onFrame,
+    this.decoder = this.createDecoder();
+  }
+
+  /** A decoder closes itself on error (e.g. one corrupt frame), so each error gets a fresh one. */
+  private createDecoder(): VideoDecoder {
+    return new VideoDecoder({
+      output: this.onFrame,
       error: (error) => {
         this.state = "unconfigured";
-        onError(error);
+        this.decoder = this.createDecoder();
+        this.onError(error);
       },
     });
   }
@@ -67,9 +73,6 @@ export class VideoReceiver {
     const config: VideoDecoderConfig = { codec, optimizeForLatency: true };
     const { supported } = await VideoDecoder.isConfigSupported(config);
     if (!supported) throw new Error(`This browser cannot decode ${codec}`);
-    if (this.decoder.state === "closed") {
-      throw new Error("The video decoder was closed after an error; reload the cockpit");
-    }
     this.decoder.configure(config);
     this.state = "decoding";
     this.decode(firstKey, true);

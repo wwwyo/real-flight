@@ -35,9 +35,13 @@ let fps = 0;
 setInterval(() => ([fps, framesThisSecond] = [framesThisSecond, 0]), 1000);
 
 const video = new VideoReceiver((frame) => {
-  ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
-  markers = detector.detect(frame);
-  frame.close();
+  try {
+    ctx.drawImage(frame, 0, 0, canvas.width, canvas.height);
+  } finally {
+    frame.close();
+  }
+  errorBox.textContent = "";
+  markers = detector.detect(canvas);
   const now = performance.now();
   sortie.update(now, markers.filter((m) => isInReticle(m.center, reticle)).map((m) => m.id));
   drawHud(ctx, {
@@ -100,6 +104,7 @@ function runCommand(command: Command): void {
     recorder.start();
   } else {
     sortie.land(now);
+    clearTimeout(stopRecordingTimer);
     stopRecordingTimer = setTimeout(() => recorder.stop(), RECORD_AFTER_LANDING_MS);
   }
 }
