@@ -1,5 +1,5 @@
 import type { DetectedMarker } from "./detector";
-import { enemyBounds, type Box } from "./enemy";
+import { targetBounds, type Box } from "./target-layer";
 import type { SortieState } from "./sortie";
 
 export type Reticle = { x: number; y: number; radius: number };
@@ -41,7 +41,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   ctx.textBaseline = "bottom";
   for (const marker of hud.markers) {
     const down = sortie.shotDown.includes(marker.id);
-    const box = enemyBounds(marker);
+    const box = targetBounds(marker);
     ctx.strokeStyle = ctx.fillStyle = down ? RED : AMBER;
     drawBrackets(ctx, box, 18 * unit);
     text(ctx, down ? "DOWN" : `TGT ${marker.id}`, (box.left + box.right) / 2, box.top - 6 * unit);

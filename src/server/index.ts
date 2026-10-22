@@ -20,19 +20,27 @@ await drone.connect();
 let lastRcAt = 0;
 let pilots = 0;
 
+/** Names the cockpit is opened with, on the Mac or through `adb reverse` on the Quest. */
+const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
+
 /**
  * Only the cockpit page itself may drive the drone or write recordings. Browsers let any page open
- * a WebSocket or POST to localhost, so a request from another origin is refused.
+ * a WebSocket or POST to localhost, so a request from another origin is refused. Matching Origin
+ * with Host alone is not enough: a page on a DNS-rebound name sends its own name in both.
  */
 function fromCockpit(req: Request): boolean {
+  const host = req.headers.get("host");
+  if (!host || !LOOPBACK_HOSTS.has(new URL(`http://${host}`).hostname)) return false;
   const origin = req.headers.get("origin");
-  return origin === null || origin === `http://${req.headers.get("host")}`;
+  return origin === null || origin === `http://${host}`;
 }
 
 const server = Bun.serve({
   port: PORT,
   // The Quest reaches the Mac through `adb reverse`, which arrives on loopback; nothing else needs it.
   hostname: "127.0.0.1",
+  // A whole sortie recording arrives in one request; Bun's 128 MB default is about 10 minutes of video.
+  maxRequestBodySize: 1024 * 1024 * 1024,
   development: process.env.NODE_ENV !== "production",
   routes: {
     "/": cockpit,

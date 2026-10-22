@@ -16,7 +16,7 @@ bun install
 bun run dev                  # シミュレーターの機体で http://localhost:8080 にコックピットを起動
 ```
 
-Chrome で `http://localhost:8080` を開く。シミュレーターの機体は、標的のマーカーを置いた平らな世界の上でカメラを飛ばすので、実機なしでコックピット全体を動かせる。キーは `T` 離陸、`W/S` 上昇・下降、`A/D` 旋回、矢印キーで前後左右、`L` 着陸、`Space` 非常停止。URL に `?debug` を付けると、フレームレート・デコード待ち・検出時間を HUD に表示する。WebXR は [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) 拡張で机上で試せる。
+Chrome で `http://localhost:8080` を開く。シミュレーターの機体は、空・雲・山・畑の景色に標的のマーカーを置き、その中でカメラを飛ばすので、実機なしでコックピット全体を動かせる。キーは `T` 離陸、`W/S` 上昇・下降、`A/D` 旋回、矢印キーで前後左右、`L` 着陸、`Space` 非常停止。URL に `?debug` を付けると、フレームレート・デコード待ち・検出時間を HUD に表示する。WebXR は [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) 拡張で机上で試せる。
 
 実機（Tello と、開発者モードの Quest 3）では次のようにする。
 

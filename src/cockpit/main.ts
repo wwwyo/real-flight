@@ -2,7 +2,7 @@ import { WS_PATH, type CockpitMessage, type Command, type ServerMessage } from "
 import { TARGET_IDS } from "../shared/targets";
 import { Controls } from "./controls";
 import { MarkerDetector } from "./detector";
-import { EnemyLayer } from "./enemy";
+import { TargetLayer } from "./target-layer";
 import { drawHud, isInReticle } from "./hud";
 import { SortieRecorder } from "./recorder";
 import { Sortie } from "./sortie";
@@ -24,9 +24,11 @@ const reticle = { x: canvas.width / 2, y: canvas.height / 2, radius: canvas.heig
 const targetIds = new Set<number>(TARGET_IDS);
 const sortie = new Sortie(TARGET_IDS);
 const detector = new MarkerDetector(canvas.width, canvas.height);
-const enemies = new EnemyLayer();
+const targets = new TargetLayer();
 const controls = new Controls();
 const recorder = new SortieRecorder(canvas, (path) => console.info(`recording saved to ${path}`), showError);
+/** Set while the error box shows a video error, which the next decoded frame clears. */
+let videoErrorShown = false;
 const xr = new XrCockpit(canvas, controlTick, () => runCommand("land"));
 document.body.append(xr.button());
 
@@ -42,13 +44,16 @@ const video = new VideoReceiver((frame) => {
   } finally {
     frame.close();
   }
-  errorBox.textContent = "";
+  if (videoErrorShown) {
+    errorBox.textContent = "";
+    videoErrorShown = false;
+  }
   const markers = detector.detect(canvas).filter((m) => targetIds.has(m.id));
   const now = performance.now();
-  const shown = enemies.track(markers, now);
+  const shown = targets.track(markers, now);
   const shotDown = sortie.update(now, markers.filter((m) => isInReticle(m.center, reticle)).map((m) => m.id));
-  for (const id of shotDown) enemies.explode(id, now);
-  enemies.draw(ctx, shown, sortie.state, now);
+  for (const id of shotDown) targets.explode(id, now);
+  targets.draw(ctx, shown, sortie.state, now);
   drawHud(ctx, {
     sortie: sortie.state,
     markers: shown,
@@ -60,7 +65,10 @@ const video = new VideoReceiver((frame) => {
   });
   xr.invalidate();
   framesThisSecond++;
-}, showError);
+}, (error) => {
+  showError(error);
+  videoErrorShown = true;
+});
 
 let socket: WebSocket | undefined;
 function connect(): void {

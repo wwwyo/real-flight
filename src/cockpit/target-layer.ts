@@ -8,7 +8,7 @@ type Affine = { a: Point; b: Point; origin: Point };
 const EXPLOSION_MS = 700;
 
 /**
- * The enemy robot, in sprite units where the detected marker spans (100,130)–(200,230).
+ * A target is shown as an enemy robot, in sprite units where the detected marker spans (100,130)–(200,230).
  * The torso covers the marker with its white quiet zone plus a margin, so no black-and-white
  * pattern shows around the robot even when the corners jitter.
  */
@@ -72,7 +72,7 @@ function toScreen({ a, b, origin }: Affine, u: number, v: number): Point {
 }
 
 /** The screen box around the robot drawn on a marker, for placing its HUD label. */
-export function enemyBounds(marker: DetectedMarker): Box {
+export function targetBounds(marker: DetectedMarker): Box {
   const affine = spriteAffine(marker);
   const right = SPRITE.x + SPRITE.width;
   const bottom = SPRITE.y + SPRITE.height;
@@ -91,11 +91,11 @@ export function enemyBounds(marker: DetectedMarker): Box {
 }
 
 /**
- * Draws an enemy robot over each target marker in the view. A robot stays where its marker was
+ * Draws each target in the view as an enemy robot over its marker. A robot stays where its marker was
  * last seen for a short while, because ArUco misses markers on blurry frames and the bare
  * pattern would flash through.
  */
-export class EnemyLayer {
+export class TargetLayer {
   /** Rasterized once: drawing the SVG or a canvas filter every frame is costly on the Quest. */
   private sprites: { alive: OffscreenCanvas; wreck: OffscreenCanvas } | null = null;
   private lastSeen = new Map<number, { marker: DetectedMarker; at: number }>();
@@ -121,7 +121,7 @@ export class EnemyLayer {
   explode(id: number, now: number): void {
     const marker = this.lastSeen.get(id)?.marker;
     if (!marker) return;
-    const { left, top, right, bottom } = enemyBounds(marker);
+    const { left, top, right, bottom } = targetBounds(marker);
     this.explosions.set(id, {
       at: now,
       center: { x: (left + right) / 2, y: (top + bottom) / 2 },
