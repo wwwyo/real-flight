@@ -3,7 +3,7 @@ import type { Command, RcInput } from "../shared/protocol";
 export type ControlFrame = { rc: RcInput; commands: Command[] };
 
 const DEADZONE = 0.12;
-/** When several buttons go down on the same frame, the safest command is sent first. */
+/** When several buttons are down, only the safest newly pressed command is sent. */
 const COMMAND_PRIORITY: readonly Command[] = ["emergency", "land", "takeoff"];
 // Touch controller: buttons[4] is A on the right hand and X on the left, buttons[5] is B / Y.
 const TOUCH_A_X = 4;
@@ -29,7 +29,7 @@ export class Controls {
     window.addEventListener("blur", () => this.keys.clear());
   }
 
-  /** Samples input once per frame; commands fire on the press, not while held. */
+  /** Samples input once per frame; a command fires on the press, not while held. */
   read(xrSources?: Iterable<XRInputSource>): ControlFrame {
     const sticks = { lx: 0, ly: 0, rx: 0, ry: 0 };
     const buttons = new Set<Command>();
@@ -67,9 +67,10 @@ export class Controls {
     if (this.keys.has("KeyL")) buttons.add("land");
     if (this.keys.has("Space")) buttons.add("emergency");
 
-    const commands = COMMAND_PRIORITY.filter(
-      (command) => buttons.has(command) && !this.pressed.has(command),
-    );
+    const fresh = COMMAND_PRIORITY.find((command) => buttons.has(command) && !this.pressed.has(command));
+    // Holding emergency or land must never be undone by a take-off pressed at the same time.
+    const blocked = fresh === "takeoff" && (buttons.has("emergency") || buttons.has("land"));
+    const commands = fresh && !blocked ? [fresh] : [];
     this.pressed = buttons;
 
     return {
