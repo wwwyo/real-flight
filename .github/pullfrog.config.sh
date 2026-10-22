@@ -57,6 +57,7 @@ mise trust -a 2>/dev/null || true
 mise install -y
 mkdir -p "$HOME/.local/bin"
 ln -sf "$HOME"/.local/share/mise/shims/* "$HOME"/.local/bin/ 2>/dev/null || true
+[ ! -f package.json ] || bun install
 PULLFROG_HOOK_SETUP
 
 # explicit unsets — keep the backend converged on this file
