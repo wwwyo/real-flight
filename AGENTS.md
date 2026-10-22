@@ -67,6 +67,7 @@ The Quest 3 reaches the Mac over USB: `adb reverse tcp:<port> tcp:<port>`, then 
 ## Skills
 
 - Read `docs/adr/` before changing where decoding, lock-on or recording runs
+- [cockpit-qa](.agents/skills/cockpit-qa/SKILL.md) — read before running the cockpit and reporting what it did
 - Measured latency and Quest browser quirks go into `.agents/skills/<topic>/` once found
 
 ## Review
