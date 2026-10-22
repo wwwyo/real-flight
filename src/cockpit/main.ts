@@ -13,8 +13,8 @@ const RC_INTERVAL_MS = 50;
 const DESK_INPUT_INTERVAL_MS = 16;
 /** `?debug` shows decode/detection stats; off by default so they stay out of the sortie video. */
 const DEBUG = new URLSearchParams(location.search).has("debug");
-/** Keeps recording after landing so the sortie video shows the touchdown. */
-const RECORD_AFTER_LANDING_MS = 3000;
+/** Keeps recording after landing so the sortie video shows the touchdown; a Tello takes a few seconds to come down. */
+const RECORD_AFTER_LANDING_MS = 5000;
 
 const canvas = document.querySelector<HTMLCanvasElement>("#view")!;
 const errorBox = document.querySelector<HTMLElement>("#error")!;

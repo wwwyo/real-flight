@@ -176,8 +176,8 @@ function drawExplosion(ctx: CanvasRenderingContext2D, center: Point, size: numbe
   ctx.beginPath();
   ctx.arc(center.x, center.y, radius, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = `rgba(255, 230, 180, ${0.8 * (1 - t)})`;
-  ctx.lineWidth = Math.max(2, size * 0.03 * (1 - t));
+  ctx.strokeStyle = `rgba(255, 230, 180, ${0.45 * (1 - t) ** 2})`;
+  ctx.lineWidth = Math.max(1, size * 0.015 * (1 - t));
   ctx.beginPath();
   ctx.arc(center.x, center.y, size * (0.3 + 0.9 * t), 0, Math.PI * 2);
   ctx.stroke();
