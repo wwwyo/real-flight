@@ -9,28 +9,43 @@ const VIEW_H = 720;
 const WORLD_W = 4000;
 const WORLD_H = 1800;
 const FPS = 30;
-const MARKER_PX = 90;
+/**
+ * The cockpit needs a marker of about 80px to find it, and an unfound marker shows as a bare
+ * pattern without a robot. This size leaves a margin, and MIN_ZOOM keeps markers at least this big.
+ */
+const MARKER_PX = 120;
+const MIN_ZOOM = 1;
+const MAX_ZOOM = 2.5;
 /** World pixels per frame at full stick. */
 const MAX_SPEED = 24;
+/** World pixels per frame for the automatic climb after take-off and the descent when landing. */
+const CLIMB_SPEED = 8;
 const HORIZON = 1300;
+/** Hover altitude after take-off; low enough that no target starts inside the reticle. */
+const TAKEOFF_ALTITUDE_Y = 1130;
+/**
+ * Tops of the two rows of fixed targets: both rows are wholly in view at the take-off altitude
+ * and out of view from the ground, since a marker cut by the frame edge is not found.
+ */
+const TARGET_ROWS = [940, 800];
 
 const DICTIONARY = new AR.Dictionary(MARKER_DICTIONARY);
 
 type Pose = { x: number; y: number; zoom: number };
+type Phase = "landed" | "climbing" | "flying" | "descending";
 
 /**
  * A stand-in drone for developing without a Tello: it flies a camera over a flat landscape with
  * the target markers in it and encodes the view to H.264 with ffmpeg, like a real camera stream.
- * Pixels are RGBA packed in a Uint32 (little-endian, so R is the low byte), one write per pixel.
  */
 export class SimDrone implements Drone {
   readonly name = "sim";
   private world = renderWorld();
   private movingMarker = markerBitmap(TARGET_IDS.at(-1)!);
-  private pose: Pose = { x: WORLD_W / 2, y: WORLD_H / 2 + 300, zoom: 1 };
+  private pose: Pose = { x: WORLD_W / 2, y: groundY(1), zoom: 1 };
+  private phase: Phase = "landed";
   private velocity: RcInput = { ...HOVER };
   private input: RcInput = { ...HOVER };
-  private flying = false;
   private batteryPercent = 100;
   private flownFrames = 0;
   private encoder?: Bun.Subprocess<"pipe", "pipe", "inherit">;
@@ -55,16 +70,18 @@ export class SimDrone implements Drone {
   }
 
   takeoff(): void {
-    this.flying = true;
+    if (this.phase === "landed" || this.phase === "descending") this.phase = "climbing";
   }
 
   land(): void {
-    this.flying = false;
+    if (this.phase !== "landed") this.phase = "descending";
   }
 
+  /** The motors stop, so the drone drops straight to the ground. */
   emergency(): void {
-    this.flying = false;
+    this.phase = "landed";
     this.velocity = { ...HOVER };
+    this.pose.y = groundY(this.pose.zoom);
   }
 
   async *frames(): AsyncIterable<Uint8Array> {
@@ -79,25 +96,35 @@ export class SimDrone implements Drone {
 
   private tick(): void {
     this.move();
-    this.encoder?.stdin.write(new Uint8Array(this.renderView().buffer));
+    this.encoder?.stdin.write(this.renderView());
     this.encoder?.stdin.flush();
   }
 
   private move(): void {
-    const target = this.flying ? this.input : HOVER;
+    if (this.phase === "landed") return;
+    if (++this.flownFrames % (FPS * 20) === 0) this.batteryPercent = Math.max(0, this.batteryPercent - 1);
+    // Like a Tello, the drone ignores the sticks while it takes off or lands.
+    const target = this.phase === "flying" ? this.input : HOVER;
     // First-order lag so the view drifts like an airframe instead of snapping to the sticks.
     for (const axis of ["leftRight", "forwardBack", "upDown", "yaw"] as const) {
       this.velocity[axis] += (target[axis] - this.velocity[axis]) * 0.12;
     }
     const v = this.velocity;
-    this.pose.zoom = clamp(this.pose.zoom * (1 + (v.forwardBack / 100) * 0.02), 0.5, 2.5);
+    this.pose.zoom = clamp(this.pose.zoom * (1 + (v.forwardBack / 100) * 0.02), MIN_ZOOM, MAX_ZOOM);
     const halfW = VIEW_W / 2 / this.pose.zoom;
-    const halfH = VIEW_H / 2 / this.pose.zoom;
     this.pose.x = clamp(this.pose.x + ((v.yaw + v.leftRight * 0.5) / 100) * MAX_SPEED, halfW, WORLD_W - halfW);
-    this.pose.y = clamp(this.pose.y - (v.upDown / 100) * MAX_SPEED, halfH, WORLD_H - halfH);
-    if (this.flying && ++this.flownFrames % (FPS * 20) === 0) {
-      this.batteryPercent = Math.max(0, this.batteryPercent - 1);
+    const ground = groundY(this.pose.zoom);
+    const top = VIEW_H / 2 / this.pose.zoom;
+    if (this.phase === "climbing") {
+      this.pose.y -= CLIMB_SPEED;
+      if (this.pose.y <= TAKEOFF_ALTITUDE_Y) this.phase = "flying";
+    } else if (this.phase === "descending") {
+      this.pose.y += CLIMB_SPEED;
+      if (this.pose.y >= ground) this.phase = "landed";
+    } else {
+      this.pose.y -= (v.upDown / 100) * MAX_SPEED;
     }
+    this.pose.y = clamp(this.pose.y, top, ground);
   }
 
   private renderView(): Uint32Array {
@@ -113,7 +140,7 @@ export class SimDrone implements Drone {
       for (let c = 0; c < VIEW_W; c++) out[row + c] = this.world[wy + columns[c]!]!;
     }
     this.drawMovingTarget(out);
-    if (!this.flying) dim(out);
+    if (this.phase === "landed") dim(out);
     return out;
   }
 
@@ -136,29 +163,46 @@ export class SimDrone implements Drone {
   }
 }
 
-/**
- * Sky, clouds, two mountain ridges and fields. A plain backdrop gave no sense of moving, so the
- * scenery has detail at every height the camera can pan to.
- */
+/** The camera height at which the bottom of the view touches the bottom of the world. */
+function groundY(zoom: number): number {
+  return WORLD_H - VIEW_H / 2 / zoom;
+}
+
+/** Sky, clouds, two mountain ridges and fields, with detail at every height the camera can reach. */
 function renderWorld(): Uint32Array {
   const world = new Uint32Array(WORLD_W * WORLD_H);
   const random = seededRandom(7);
   const farRidge = ridge(HORIZON - 260, 140, random);
   const nearRidge = ridge(HORIZON - 120, 90, random);
-  for (let y = 0; y < WORLD_H; y++) {
+  const farColor = rgb(110, 130, 165);
+  for (let y = 0; y < HORIZON; y++) {
     const t = y / HORIZON;
     const sky = rgb(40 + 120 * t, 90 + 110 * t, 170 + 70 * t);
     for (let x = 0; x < WORLD_W; x++) {
-      let color = sky;
-      if (y >= HORIZON) {
-        const patch = hash(Math.floor(x / 220), Math.floor((y - HORIZON) / 60));
-        const shade = 0.75 + 0.25 * patch + 0.15 * ((y - HORIZON) / (WORLD_H - HORIZON));
+      const near = nearRidge[x]!;
+      let color = y >= farRidge[x]! ? farColor : sky;
+      if (y >= near) {
+        // Darker further below the ridge line, speckled like trees.
+        const shade = 1 - 0.35 * Math.min(1, (y - near) / 160) - 0.12 * hash(x >> 3, y >> 3);
+        color = rgb(60 * shade, 110 * shade, 75 * shade);
+      }
+      world[y * WORLD_W + x] = color;
+    }
+  }
+  for (let y = HORIZON; y < WORLD_H; y++) {
+    // Fields widen and deepen toward the camera, so the ground reads as receding.
+    const depth = (y - HORIZON) / (WORLD_H - HORIZON);
+    const row = Math.floor(Math.sqrt(y - HORIZON) * 1.8);
+    const fieldW = 90 + 600 * depth;
+    let field = Number.NaN;
+    let color = 0;
+    for (let x = 0; x < WORLD_W; x++) {
+      const column = Math.floor((x - WORLD_W / 2) / fieldW);
+      if (column !== field) {
+        field = column;
+        const patch = hash(column, row);
+        const shade = 0.8 + 0.2 * patch + 0.15 * depth;
         color = rgb(70 * shade, (patch > 0.8 ? 120 : 140) * shade, 60 * shade);
-      } else if (y >= nearRidge[x]!) {
-        const shade = 0.8 + 0.2 * hash(Math.floor(x / 40), Math.floor(y / 40));
-        color = rgb(50 * shade, 95 * shade, 70 * shade);
-      } else if (y >= farRidge[x]!) {
-        color = rgb(110, 130, 165);
       }
       world[y * WORLD_W + x] = color;
     }
@@ -174,7 +218,7 @@ function renderWorld(): Uint32Array {
   placed.forEach((id, i) => {
     const bitmap = markerBitmap(id);
     const left = Math.round(((i + 1) / (placed.length + 1)) * WORLD_W - MARKER_PX / 2);
-    const top = Math.round(WORLD_H / 2 + (i % 2 === 0 ? 150 : -50));
+    const top = TARGET_ROWS[i % TARGET_ROWS.length]!;
     for (let r = 0; r < MARKER_PX; r++) {
       world.set(bitmap.subarray(r * MARKER_PX, (r + 1) * MARKER_PX), (top + r) * WORLD_W + left);
     }
@@ -187,6 +231,7 @@ function markerBitmap(id: number): Uint32Array {
   const code = DICTIONARY.codeList[id]!;
   const bits = DICTIONARY.markSize - 2;
   const cells = bits + 4;
+  const [white, black] = [rgb(255, 255, 255), rgb(0, 0, 0)];
   const bitmap = new Uint32Array(MARKER_PX * MARKER_PX);
   for (let r = 0; r < MARKER_PX; r++) {
     const cy = Math.floor((r / MARKER_PX) * cells);
@@ -194,20 +239,28 @@ function markerBitmap(id: number): Uint32Array {
       const cx = Math.floor((c / MARKER_PX) * cells);
       const quietZone = cy === 0 || cx === 0 || cy === cells - 1 || cx === cells - 1;
       const border = cy === 1 || cx === 1 || cy === cells - 2 || cx === cells - 2;
-      const white = quietZone || (!border && code[(cy - 2) * bits + (cx - 2)] === "1");
-      bitmap[r * MARKER_PX + c] = white ? rgb(255, 255, 255) : rgb(0, 0, 0);
+      const isWhite = quietZone || (!border && code[(cy - 2) * bits + (cx - 2)] === "1");
+      bitmap[r * MARKER_PX + c] = isWhite ? white : black;
     }
   }
   return bitmap;
 }
 
-/** Halves every channel; the mask keeps each channel's top bit from spilling into the next. */
+/** Darkens every channel to 3/4; the mask keeps each channel's low bits from leaking into the next. */
 function dim(frame: Uint32Array): void {
-  for (let i = 0; i < frame.length; i++) frame[i] = ((frame[i]! >>> 1) & 0x7f7f7f7f) | 0xff000000;
+  for (let i = 0; i < frame.length; i++) frame[i] = frame[i]! - ((frame[i]! >>> 2) & 0x003f3f3f);
 }
 
+/**
+ * Packs a color as ffmpeg's `rgba` pixel format reads it from a Uint32Array: little-endian, so R is
+ * the low byte. One store per pixel instead of four.
+ */
 function rgb(r: number, g: number, b: number): number {
   return ((0xff << 24) | (clamp(Math.round(b), 0, 255) << 16) | (clamp(Math.round(g), 0, 255) << 8) | clamp(Math.round(r), 0, 255)) >>> 0;
+}
+
+function channels(color: number): [r: number, g: number, b: number] {
+  return [color & 0xff, (color >>> 8) & 0xff, (color >>> 16) & 0xff];
 }
 
 /** Heights of a mountain ridge along the world, from a few overlapping sine waves. */
@@ -232,12 +285,8 @@ function cloudPuff(world: Uint32Array, cx: number, cy: number, rx: number, ry: n
       if (d >= 1) continue;
       const alpha = 0.85 * (1 - d * d);
       const i = y * WORLD_W + x;
-      const p = world[i]!;
-      world[i] = rgb(
-        (p & 0xff) + (255 - (p & 0xff)) * alpha,
-        ((p >>> 8) & 0xff) + (255 - ((p >>> 8) & 0xff)) * alpha,
-        ((p >>> 16) & 0xff) + (255 - ((p >>> 16) & 0xff)) * alpha,
-      );
+      const [r, g, b] = channels(world[i]!);
+      world[i] = rgb(r + (255 - r) * alpha, g + (255 - g) * alpha, b + (255 - b) * alpha);
     }
   }
 }

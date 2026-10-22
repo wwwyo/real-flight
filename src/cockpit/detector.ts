@@ -8,7 +8,12 @@ export type DetectedMarker = {
   center: { x: number; y: number };
 };
 
-/** Finds ArUco markers on a downscaled copy of the view; full resolution is too slow per frame. */
+/**
+ * Finds ArUco markers on a downscaled copy of the view; full resolution is too slow per frame.
+ * A marker must span about 60px in the scaled copy to be found, so the scale sets how far away a
+ * target can be: at 0.75 a marker needs about 80px of the 960px-wide view (0.5 missed markers
+ * at 130px). Lower it only if the Quest cannot keep up.
+ */
 export class MarkerDetector {
   private detector = new AR.Detector({ dictionaryName: MARKER_DICTIONARY });
   private scratch: OffscreenCanvasRenderingContext2D;
@@ -17,7 +22,7 @@ export class MarkerDetector {
   constructor(
     private readonly width: number,
     private readonly height: number,
-    private readonly scale = 0.5,
+    private readonly scale = 0.75,
   ) {
     const canvas = new OffscreenCanvas(Math.round(width * scale), Math.round(height * scale));
     this.scratch = canvas.getContext("2d", { willReadFrequently: true })!;

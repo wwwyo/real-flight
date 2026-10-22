@@ -1,5 +1,5 @@
 import type { DetectedMarker } from "./detector";
-import { enemyBounds } from "./enemy";
+import { enemyBounds, type Box } from "./enemy";
 import type { SortieState } from "./sortie";
 
 export type Reticle = { x: number; y: number; radius: number };
@@ -37,15 +37,14 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   ctx.font = font(22, unit);
   ctx.textBaseline = "top";
 
+  ctx.textAlign = "center";
+  ctx.textBaseline = "bottom";
   for (const marker of hud.markers) {
     const down = sortie.shotDown.includes(marker.id);
-    if (!down && !sortie.remaining.includes(marker.id)) continue;
     const box = enemyBounds(marker);
     ctx.strokeStyle = ctx.fillStyle = down ? RED : AMBER;
     drawBrackets(ctx, box, 18 * unit);
-    ctx.textAlign = "center";
-    ctx.textBaseline = "bottom";
-    ctx.fillText(down ? "DOWN" : `TGT ${marker.id}`, (box.left + box.right) / 2, box.top - 6 * unit);
+    text(ctx, down ? "DOWN" : `TGT ${marker.id}`, (box.left + box.right) / 2, box.top - 6 * unit);
   }
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
@@ -72,23 +71,23 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   const pad = 24 * unit;
   const line = 30 * unit;
   const total = sortie.remaining.length + sortie.shotDown.length;
-  ctx.fillText(`TGT ${sortie.remaining.length}/${total}`, pad, pad);
-  ctx.fillText(`T+${formatTime(sortie.elapsedMs)}`, pad, pad + line);
+  text(ctx, `TGT ${sortie.remaining.length}/${total}`, pad, pad);
+  text(ctx, `T+${formatTime(sortie.elapsedMs)}`, pad, pad + line);
   ctx.fillStyle = hud.battery !== null && hud.battery < 20 ? RED : GREEN;
-  ctx.fillText(`BAT ${hud.battery ?? "--"}%`, pad, pad + line * 2);
+  text(ctx, `BAT ${hud.battery ?? "--"}%`, pad, pad + line * 2);
 
   ctx.textAlign = "right";
   ctx.fillStyle = GREEN;
-  ctx.fillText(hud.linkUp ? "LINK OK" : "LINK LOST", width - pad, pad);
+  text(ctx, hud.linkUp ? "LINK OK" : "LINK LOST", width - pad, pad);
   if (hud.stats) {
     const { fps, decodeQueue, detectMs } = hud.stats;
     ctx.font = font(16, unit, 400);
-    ctx.fillText(`${fps}fps q${decodeQueue} det ${detectMs.toFixed(0)}ms`, width - pad, pad + line);
+    text(ctx, `${fps}fps q${decodeQueue} det ${detectMs.toFixed(0)}ms`, width - pad, pad + line);
   }
   if (hud.recording) {
     ctx.fillStyle = RED;
     ctx.font = font(22, unit);
-    ctx.fillText("● REC", width - pad, pad + line * 2);
+    text(ctx, "● REC", width - pad, pad + line * 2);
   }
 
   ctx.textAlign = "center";
@@ -96,15 +95,26 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   const banner = bannerFor(sortie);
   if (banner) {
     ctx.fillStyle = sortie.phase === "complete" ? AMBER : GREEN;
-    ctx.fillText(banner, width / 2, height - 80 * unit);
+    text(ctx, banner, width / 2, height - 80 * unit);
   }
   ctx.restore();
+}
+
+/** Fills text over a dark outline, so it stays readable over clouds and bright sky. */
+function text(ctx: CanvasRenderingContext2D, value: string, x: number, y: number): void {
+  ctx.save();
+  ctx.strokeStyle = "rgba(0, 0, 0, 0.6)";
+  ctx.lineWidth = ctx.lineWidth * 1.5;
+  ctx.lineJoin = "round";
+  ctx.strokeText(value, x, y);
+  ctx.restore();
+  ctx.fillText(value, x, y);
 }
 
 /** Corner brackets around a target, so the robot itself stays unobstructed. */
 function drawBrackets(
   ctx: CanvasRenderingContext2D,
-  { left, top, right, bottom }: { left: number; top: number; right: number; bottom: number },
+  { left, top, right, bottom }: Box,
   arm: number,
 ): void {
   ctx.beginPath();

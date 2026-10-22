@@ -21,6 +21,7 @@ const errorBox = document.querySelector<HTMLElement>("#error")!;
 const ctx = canvas.getContext("2d")!;
 const reticle = { x: canvas.width / 2, y: canvas.height / 2, radius: canvas.height * 0.11 };
 
+const targetIds = new Set<number>(TARGET_IDS);
 const sortie = new Sortie(TARGET_IDS);
 const detector = new MarkerDetector(canvas.width, canvas.height);
 const enemies = new EnemyLayer();
@@ -42,7 +43,7 @@ const video = new VideoReceiver((frame) => {
     frame.close();
   }
   errorBox.textContent = "";
-  const markers = detector.detect(canvas);
+  const markers = detector.detect(canvas).filter((m) => targetIds.has(m.id));
   const now = performance.now();
   const shown = enemies.track(markers, now);
   const shotDown = sortie.update(now, markers.filter((m) => isInReticle(m.center, reticle)).map((m) => m.id));

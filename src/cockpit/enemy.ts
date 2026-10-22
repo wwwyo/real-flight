@@ -1,6 +1,9 @@
 import type { DetectedMarker } from "./detector";
-import { LOCK_GRACE_MS } from "./sortie";
-import type { SortieState } from "./sortie";
+import { LOCK_GRACE_MS, type SortieState } from "./sortie";
+
+export type Box = { left: number; top: number; right: number; bottom: number };
+type Point = { x: number; y: number };
+type Affine = { a: Point; b: Point; origin: Point };
 
 const EXPLOSION_MS = 700;
 
@@ -9,15 +12,16 @@ const EXPLOSION_MS = 700;
  * The torso covers the marker with its white quiet zone plus a margin, so no black-and-white
  * pattern shows around the robot even when the corners jitter.
  */
-const SPRITE_W = 300;
-const SPRITE_H = 360;
+const SPRITE = { x: 34, y: 0, width: 232, height: 340 };
 const MARKER_ORIGIN = { x: 100, y: 130 };
 const MARKER_SPAN = 100;
+/** Rasterized at twice the sprite size so close-up robots stay sharp. */
+const BAKE_SCALE = 2;
 /** A wreck hangs tilted around its chest; small enough that the torso still hides the marker. */
 const WRECK_PIVOT = { x: 150, y: 180 };
 const WRECK_TILT = 0.1;
 
-const ROBOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SPRITE_W} ${SPRITE_H}">
+const ROBOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${SPRITE.x} ${SPRITE.y} ${SPRITE.width} ${SPRITE.height}">
   <defs>
     <radialGradient id="flame" cx="0.5" cy="0.2" r="0.8">
       <stop offset="0" stop-color="#fff6c8"/><stop offset="0.45" stop-color="#ffb347"/><stop offset="1" stop-color="#ff5a1f" stop-opacity="0"/>
@@ -30,13 +34,13 @@ const ROBOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SPRITE
     </linearGradient>
   </defs>
   <g stroke="#0d0f14" stroke-width="4" stroke-linejoin="round">
-    <ellipse cx="117" cy="322" rx="17" ry="34" fill="url(#flame)" stroke="none"/>
-    <ellipse cx="183" cy="322" rx="17" ry="34" fill="url(#flame)" stroke="none"/>
-    <path d="M98 240 h40 l-4 62 h-32 z M162 240 h40 l-4 62 h-32 z" fill="#3a4250"/>
-    <path d="M44 150 h38 v84 l-8 26 h-22 l-8 -26 z M218 150 h38 v84 l-8 26 h-22 l-8 -26 z" fill="#3a4250"/>
-    <path d="M52 254 h14 v22 h-14 z M234 254 h14 v22 h-14 z" fill="#1b1f27"/>
+    <ellipse cx="117" cy="314" rx="15" ry="24" fill="url(#flame)" stroke="none"/>
+    <ellipse cx="183" cy="314" rx="15" ry="24" fill="url(#flame)" stroke="none"/>
+    <path d="M98 240 h40 l-4 56 h-32 z M162 240 h40 l-4 56 h-32 z" fill="#3a4250"/>
+    <path d="M42 150 h34 v80 l-7 24 h-20 l-7 -24 z M224 150 h34 v80 l-7 24 h-20 l-7 -24 z" fill="#3a4250"/>
+    <path d="M52 248 h14 v20 h-14 z M234 248 h14 v20 h-14 z" fill="#1b1f27"/>
     <path d="M70 100 H230 L244 170 L222 264 H78 L56 170 Z" fill="url(#steel)"/>
-    <path d="M28 128 Q30 92 74 92 L96 104 L92 160 L36 164 Z M272 128 Q270 92 226 92 L204 104 L208 160 L264 164 Z" fill="#a8323a"/>
+    <path d="M38 130 Q40 94 76 92 L96 104 L92 158 L44 162 Z M262 130 Q260 94 224 92 L204 104 L208 158 L256 162 Z" fill="#a8323a"/>
     <path d="M84 118 H216 M88 238 H212 M150 118 V150 M150 210 V238" fill="none" stroke="#1b1f27" stroke-width="3"/>
     <circle cx="150" cy="180" r="26" fill="url(#glow)"/>
     <path d="M100 196 h18 M100 208 h18 M182 196 h18 M182 208 h18" stroke="#ffb347" stroke-width="4"/>
@@ -47,9 +51,6 @@ const ROBOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${SPRITE
     <circle cx="150" cy="70" r="8" fill="url(#glow)" stroke="none"/>
   </g>
 </svg>`;
-
-type Point = { x: number; y: number };
-type Affine = { a: Point; b: Point; origin: Point };
 
 /** Maps sprite units onto the marker's plane, so the robot follows its tilt and distance. */
 function spriteAffine(marker: DetectedMarker): Affine {
@@ -66,18 +67,27 @@ function spriteAffine(marker: DetectedMarker): Affine {
   };
 }
 
+function toScreen({ a, b, origin }: Affine, u: number, v: number): Point {
+  return { x: origin.x + u * a.x + v * b.x, y: origin.y + u * a.y + v * b.y };
+}
+
 /** The screen box around the robot drawn on a marker, for placing its HUD label. */
-export function enemyBounds(marker: DetectedMarker): { left: number; top: number; right: number; bottom: number } {
-  const { a, b, origin } = spriteAffine(marker);
-  const points = [
-    [0, 0],
-    [SPRITE_W, 0],
-    [0, SPRITE_H],
-    [SPRITE_W, SPRITE_H],
-  ].map(([u, v]) => ({ x: origin.x + u! * a.x + v! * b.x, y: origin.y + u! * a.y + v! * b.y }));
-  const xs = points.map((p) => p.x);
-  const ys = points.map((p) => p.y);
-  return { left: Math.min(...xs), top: Math.min(...ys), right: Math.max(...xs), bottom: Math.max(...ys) };
+export function enemyBounds(marker: DetectedMarker): Box {
+  const affine = spriteAffine(marker);
+  const right = SPRITE.x + SPRITE.width;
+  const bottom = SPRITE.y + SPRITE.height;
+  const corners = [
+    toScreen(affine, SPRITE.x, SPRITE.y),
+    toScreen(affine, right, SPRITE.y),
+    toScreen(affine, SPRITE.x, bottom),
+    toScreen(affine, right, bottom),
+  ];
+  return {
+    left: Math.min(...corners.map((p) => p.x)),
+    top: Math.min(...corners.map((p) => p.y)),
+    right: Math.max(...corners.map((p) => p.x)),
+    bottom: Math.max(...corners.map((p) => p.y)),
+  };
 }
 
 /**
@@ -86,12 +96,17 @@ export function enemyBounds(marker: DetectedMarker): { left: number; top: number
  * pattern would flash through.
  */
 export class EnemyLayer {
-  private sprite = new Image();
+  /** Rasterized once: drawing the SVG or a canvas filter every frame is costly on the Quest. */
+  private sprites: { alive: OffscreenCanvas; wreck: OffscreenCanvas } | null = null;
   private lastSeen = new Map<number, { marker: DetectedMarker; at: number }>();
   private explosions = new Map<number, { at: number; center: Point; size: number }>();
 
   constructor() {
-    this.sprite.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(ROBOT_SVG)}`;
+    const image = new Image();
+    image.src = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(ROBOT_SVG)}`;
+    void image.decode().then(() => {
+      this.sprites = { alive: bake(image, "none"), wreck: bake(image, "grayscale(1) brightness(0.45)") };
+    });
   }
 
   /** Returns the markers to draw this frame: the ones detected now and the ones just missed. */
@@ -115,10 +130,9 @@ export class EnemyLayer {
   }
 
   draw(ctx: CanvasRenderingContext2D, markers: DetectedMarker[], sortie: SortieState, now: number): void {
-    if (!this.sprite.complete || this.sprite.naturalWidth === 0) return;
+    if (!this.sprites) return;
     for (const marker of markers) {
       const down = sortie.shotDown.includes(marker.id);
-      if (!down && !sortie.remaining.includes(marker.id)) continue;
       const { a, b, origin } = spriteAffine(marker);
       ctx.save();
       ctx.setTransform(a.x, a.y, b.x, b.y, origin.x, origin.y);
@@ -126,9 +140,8 @@ export class EnemyLayer {
         ctx.translate(WRECK_PIVOT.x, WRECK_PIVOT.y);
         ctx.rotate(WRECK_TILT);
         ctx.translate(-WRECK_PIVOT.x, -WRECK_PIVOT.y);
-        ctx.filter = "grayscale(1) brightness(0.45)";
       }
-      ctx.drawImage(this.sprite, 0, 0, SPRITE_W, SPRITE_H);
+      ctx.drawImage(down ? this.sprites.wreck : this.sprites.alive, SPRITE.x, SPRITE.y, SPRITE.width, SPRITE.height);
       ctx.restore();
     }
     for (const [id, explosion] of this.explosions) {
@@ -140,6 +153,14 @@ export class EnemyLayer {
       drawExplosion(ctx, explosion.center, explosion.size, t);
     }
   }
+}
+
+function bake(image: HTMLImageElement, filter: string): OffscreenCanvas {
+  const canvas = new OffscreenCanvas(SPRITE.width * BAKE_SCALE, SPRITE.height * BAKE_SCALE);
+  const ctx = canvas.getContext("2d")!;
+  ctx.filter = filter;
+  ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+  return canvas;
 }
 
 /** A fireball that swells and fades, with a shock ring running ahead of it; `t` runs 0→1. */
