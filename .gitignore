@@ -7,3 +7,5 @@ dist/
 recordings/
 *.h264
 *.webm
+
+.e2e/

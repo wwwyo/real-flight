@@ -1,8 +1,8 @@
 import { AR } from "js-aruco2";
 import { AccessUnitSplitter } from "../../shared/h264";
-import type { RcInput } from "../../shared/protocol";
+import { HOVER, type RcInput } from "../../shared/protocol";
 import { MARKER_DICTIONARY, TARGET_IDS } from "../../shared/targets";
-import { HOVER, type Drone } from "./drone";
+import type { Drone } from "./drone";
 
 const VIEW_W = 960;
 const VIEW_H = 720;

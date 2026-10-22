@@ -11,6 +11,8 @@ export type RcInput = {
   yaw: number;
 };
 
+export const HOVER: RcInput = { leftRight: 0, forwardBack: 0, upDown: 0, yaw: 0 };
+
 export type CockpitMessage =
   | ({ type: "rc" } & RcInput)
   | { type: "takeoff" }
@@ -44,12 +46,18 @@ export function parseCockpitMessage(text: string): CockpitMessage | null {
   return { type: "rc", leftRight: axis("leftRight"), forwardBack: axis("forwardBack"), upDown: axis("upDown"), yaw: axis("yaw") };
 }
 
+export type ControlRole = "available" | "pilot" | "observer";
+
 export type ServerMessage = {
   type: "status";
   drone: string;
   /** Percent, or null until the drone reports it. */
   battery: number | null;
-};
+} | { type: "control"; role: ControlRole }
+  | { type: "command"; command: Command; accepted: boolean };
+
+/** No decoded frame for this long means the pilot can no longer fly from the view. */
+export const VIDEO_TIMEOUT_MS = 1000;
 
 export const WS_PATH = "/ws";
 export const RECORDINGS_PATH = "/recordings";

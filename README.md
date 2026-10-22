@@ -18,6 +18,10 @@ bun run dev                  # cockpit on http://localhost:8080 with the simulat
 
 Open `http://localhost:8080` in Chrome. The simulated drone flies a camera over sky, clouds, mountains and fields with the target markers in them, so the whole cockpit works without hardware: keys `T` take off, `W/S` up-down, `A/D` yaw, arrows forward/back/left/right, `L` land, `Space` emergency. Add `?debug` to the URL to show frame rate, decoder queue and detection time on the HUD. Try WebXR on the desk with the [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) extension.
 
+The first tab to take off owns control until it disconnects; other tabs can watch. Losing that tab lands the drone even if another tab is watching. If decoded video stops for more than 1 second, the cockpit shows a warning, stops stick input and requests landing. Land and emergency remain available without video. After landing, wait for the 5-second recording tail before taking off again; pressing takeoff while airborne leaves the sortie unchanged.
+
+Run `bun test` and `bun run typecheck` for the local checks. With the simulated server running, `bun run test:e2e` checks control ownership through the WebSocket API (`REAL_FLIGHT_TEST_URL` changes the URL). It refuses to send commands unless the server reports `drone: sim`.
+
 With the real machines (a Tello, and a Quest 3 in developer mode):
 
 ```bash

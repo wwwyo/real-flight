@@ -37,8 +37,14 @@ export class Sortie {
     this.alive = new Set(targetIds);
   }
 
-  /** Starts a new sortie; any previous one is discarded. */
+  /** Includes a completed sortie whose drone still needs to land. */
+  get airborne(): boolean {
+    return this.phase === "flying" || this.phase === "complete";
+  }
+
+  /** Starts a new sortie only after the previous drone has been told to land. */
   takeoff(now: number): void {
+    if (this.airborne) return;
     this.phase = "flying";
     this.startedAt = now;
     this.now = now;
@@ -48,9 +54,9 @@ export class Sortie {
   }
 
   land(now: number): void {
-    if (this.phase !== "flying") return;
+    if (!this.airborne) return;
+    if (this.phase === "flying") this.endedAt = now;
     this.phase = "landed";
-    this.endedAt = now;
     this.locks.clear();
   }
 
@@ -58,6 +64,10 @@ export class Sortie {
   update(now: number, inReticle: Iterable<number>): number[] {
     this.now = now;
     if (this.phase !== "flying") return [];
+    // Expire before refreshing detections: a frame gap must not count as time spent aiming.
+    for (const [id, lock] of this.locks) {
+      if (now - lock.lastSeenAt > LOCK_GRACE_MS) this.locks.delete(id);
+    }
     for (const id of inReticle) {
       if (!this.alive.has(id)) continue;
       const lock = this.locks.get(id);
@@ -65,10 +75,8 @@ export class Sortie {
       else this.locks.set(id, { startedAt: now, lastSeenAt: now });
     }
     const shot: number[] = [];
-    for (const [id, { startedAt, lastSeenAt }] of this.locks) {
-      if (now - lastSeenAt > LOCK_GRACE_MS) {
-        this.locks.delete(id);
-      } else if (now - startedAt >= this.lockMs) {
+    for (const [id, { startedAt }] of this.locks) {
+      if (now - startedAt >= this.lockMs) {
         this.locks.delete(id);
         this.alive.delete(id);
         this.down.push(id);

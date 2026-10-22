@@ -16,5 +16,3 @@ export interface Drone {
   /** Battery in percent, or null until the drone reports it. */
   battery(): number | null;
 }
-
-export const HOVER: RcInput = { leftRight: 0, forwardBack: 0, upDown: 0, yaw: 0 };

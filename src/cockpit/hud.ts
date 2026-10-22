@@ -11,6 +11,7 @@ export type HudInfo = {
   battery: number | null;
   recording: boolean;
   linkUp: boolean;
+  warning: string | null;
   /** Decode and detection numbers for tuning; null hides them. */
   stats: { fps: number; decodeQueue: number; detectMs: number } | null;
 };
@@ -91,6 +92,11 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   }
 
   ctx.textAlign = "center";
+  if (hud.warning) {
+    ctx.fillStyle = RED;
+    ctx.font = font(22, unit);
+    text(ctx, hud.warning, width / 2, height - 130 * unit);
+  }
   ctx.font = font(28, unit);
   const banner = bannerFor(sortie);
   if (banner) {

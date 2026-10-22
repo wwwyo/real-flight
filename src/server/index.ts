@@ -1,7 +1,7 @@
 import cockpit from "../cockpit/index.html";
 import markers from "../cockpit/markers.html";
-import { parseCockpitMessage, RECORDINGS_PATH, Topic, WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
-import { HOVER, type Drone } from "./drones/drone";
+import { HOVER, parseCockpitMessage, RECORDINGS_PATH, Topic, WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
+import type { Drone } from "./drones/drone";
 import { SimDrone } from "./drones/sim";
 import { Tello } from "./drones/tello";
 
@@ -18,7 +18,10 @@ const drone = createDrone();
 await drone.connect();
 
 let lastRcAt = 0;
-let pilots = 0;
+const cockpits = new Set<Bun.ServerWebSocket<unknown>>();
+let pilot: Bun.ServerWebSocket<unknown> | null = null;
+// Commanded state only; Tello acknowledgements still need validation on hardware.
+let airborne = false;
 
 /** Names the cockpit is opened with, on the Mac or through `adb reverse` on the Quest. */
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1"]);
@@ -65,41 +68,64 @@ const server = Bun.serve({
   },
   websocket: {
     open(ws) {
-      pilots++;
+      cockpits.add(ws);
       ws.subscribe(Topic.Video);
       ws.subscribe(Topic.Status);
+      sendRole(ws);
     },
-    message(_ws, message) {
+    message(ws, message) {
       if (typeof message !== "string") return;
       const parsed = parseCockpitMessage(message);
-      if (parsed) handle(parsed);
+      if (parsed) handle(ws, parsed);
     },
-    close() {
-      pilots--;
-      // Losing the cockpit must not leave the drone flying (PRD: safety).
-      if (pilots === 0) drone.land();
+    close(ws) {
+      cockpits.delete(ws);
+      if (ws !== pilot) return;
+      drone.land();
+      airborne = false;
+      pilot = null;
+      lastRcAt = 0;
+      for (const cockpit of cockpits) sendRole(cockpit);
     },
   },
 });
 
-function handle(message: CockpitMessage): void {
-  switch (message.type) {
-    case "rc": {
-      const { leftRight, forwardBack, upDown, yaw } = message;
+function sendRole(ws: Bun.ServerWebSocket<unknown>): void {
+  const role = pilot === ws ? "pilot" : pilot ? "observer" : "available";
+  ws.send(JSON.stringify({ type: "control", role } satisfies ServerMessage));
+}
+
+function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void {
+  if (message.type === "rc") {
+    if (ws === pilot && airborne) {
       lastRcAt = Date.now();
-      drone.rc({ leftRight, forwardBack, upDown, yaw });
-      return;
+      drone.rc(message);
     }
-    case "takeoff":
-      drone.takeoff();
-      return;
-    case "land":
-      drone.land();
-      return;
-    case "emergency":
-      drone.emergency();
-      return;
+    return;
   }
+  const accepted = (!pilot || ws === pilot) && (message.type !== "takeoff" || !airborne);
+  if (!accepted) {
+    ws.send(JSON.stringify({ type: "command", command: message.type, accepted } satisfies ServerMessage));
+    return;
+  }
+  switch (message.type) {
+    case "takeoff":
+      pilot = ws;
+      airborne = true;
+      lastRcAt = Date.now();
+      for (const cockpit of cockpits) sendRole(cockpit);
+      drone.takeoff();
+      break;
+    case "land":
+      airborne = false;
+      drone.land();
+      break;
+    case "emergency":
+      airborne = false;
+      drone.emergency();
+      break;
+  }
+  ws.send(JSON.stringify({ type: "command", command: message.type, accepted } satisfies ServerMessage));
 }
 
 setInterval(() => {

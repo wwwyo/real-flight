@@ -9,12 +9,14 @@
   "devDependencies": {
     "@types/bun": "1.4.3",
     "@types/three": "0.186.0",
+    "e2e": "0.21.0",
     "typescript": "7.0.2"
   },
   "scripts": {
     "dev": "bun --watch src/server/index.ts",
     "start": "bun src/server/index.ts",
     "test": "bun test",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test:e2e": "E2E_TELEMETRY_DISABLED=1 e2e run"
   }
 }
