@@ -8,6 +8,32 @@ Core actions:
 - Fly a sortie and shoot down a target — per play session
 - Watch or share a sortie video — per sortie
 
+## Glossary
+
+**Pilot**:
+The person in the Quest 3 who flies the drone.
+_Avoid_: player, operator
+
+**Drone**:
+The real machine a pilot flies. A swappable part; Tello is only the first model.
+_Avoid_: aircraft, UAV
+
+**Sortie**:
+One play session of a pilot and a drone, from takeoff to landing, in which the pilot shoots down targets.
+_Avoid_: match, round, flight
+
+**Target**:
+A physical enemy placed where the drone flies, either alive or shot down. Being shot down is virtual; nothing happens to the target itself.
+_Avoid_: enemy, marker
+
+**Cockpit**:
+The pilot's view: the drone's camera shown as if from inside the machine, with a HUD and a reticle marking where the drone points.
+_Avoid_: viewer, FPV screen
+
+**Sortie video**:
+A video of one sortie for people who were not in the cockpit: the cockpit view together with an outside view of the drone.
+_Avoid_: spectator video, replay
+
 ## Directory structure
 
 ```
