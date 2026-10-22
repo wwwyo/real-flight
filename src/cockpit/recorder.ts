@@ -1,6 +1,7 @@
 import { RECORDINGS_PATH } from "../shared/protocol";
 
-const MIME_TYPES = ["video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm", "video/mp4"];
+// H.264 first: browsers usually encode it in hardware, leaving the CPU to decode and lock-on.
+const MIME_TYPES = ["video/mp4;codecs=avc1", "video/webm;codecs=h264", "video/webm;codecs=vp8", "video/webm"];
 
 /** Records the cockpit canvas (video + HUD) and uploads each recording to the Mac. */
 export class SortieRecorder {
@@ -19,16 +20,20 @@ export class SortieRecorder {
   start(): void {
     if (this.recording) return;
     const mimeType = MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
-    const recorder = new MediaRecorder(this.canvas.captureStream(30), { mimeType });
+    const stream = this.canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (event) => chunks.push(event.data);
-    recorder.onstop = () => void this.upload(new Blob(chunks, { type: recorder.mimeType }));
+    recorder.onstop = () => {
+      for (const track of stream.getTracks()) track.stop();
+      void this.upload(new Blob(chunks, { type: recorder.mimeType }));
+    };
     recorder.start(1000);
     this.recorder = recorder;
   }
 
   stop(): void {
-    if (this.recording) this.recorder!.stop();
+    if (this.recording) this.recorder?.stop();
   }
 
   private async upload(blob: Blob): Promise<void> {

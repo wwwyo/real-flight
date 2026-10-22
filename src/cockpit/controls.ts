@@ -1,10 +1,10 @@
-import type { RcInput } from "../shared/protocol";
-
-export type Command = "takeoff" | "land" | "emergency";
+import type { Command, RcInput } from "../shared/protocol";
 
 export type ControlFrame = { rc: RcInput; commands: Command[] };
 
 const DEADZONE = 0.12;
+/** When several buttons go down on the same frame, the safest command is sent first. */
+const COMMAND_PRIORITY: readonly Command[] = ["emergency", "land", "takeoff"];
 // Touch controller: buttons[4] is A on the right hand and X on the left, buttons[5] is B / Y.
 const TOUCH_A_X = 4;
 const TOUCH_B_Y = 5;
@@ -19,7 +19,7 @@ const PAD_X = 2;
  */
 export class Controls {
   private keys = new Set<string>();
-  private pressed = new Set<string>();
+  private pressed = new Set<Command>();
 
   constructor() {
     window.addEventListener("keydown", (event) => {
@@ -32,7 +32,7 @@ export class Controls {
   /** Samples input once per frame; commands fire on the press, not while held. */
   read(xrSources?: Iterable<XRInputSource>): ControlFrame {
     const sticks = { lx: 0, ly: 0, rx: 0, ry: 0 };
-    const buttons = new Set<string>();
+    const buttons = new Set<Command>();
 
     if (xrSources) {
       for (const source of xrSources) {
@@ -67,7 +67,7 @@ export class Controls {
     if (this.keys.has("KeyL")) buttons.add("land");
     if (this.keys.has("Space")) buttons.add("emergency");
 
-    const commands = (["emergency", "land", "takeoff"] as const).filter(
+    const commands = COMMAND_PRIORITY.filter(
       (command) => buttons.has(command) && !this.pressed.has(command),
     );
     this.pressed = buttons;

@@ -1,7 +1,6 @@
-import { mkdir } from "node:fs/promises";
 import cockpit from "../cockpit/index.html";
 import markers from "../cockpit/markers.html";
-import { RECORDINGS_PATH, WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
+import { RECORDINGS_PATH, Topic, WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
 import { HOVER, type Drone } from "./drones/drone";
 import { SimDrone } from "./drones/sim";
 import { Tello } from "./drones/tello";
@@ -29,7 +28,6 @@ const server = Bun.serve({
     "/markers": markers,
     [RECORDINGS_PATH]: {
       POST: async (req) => {
-        await mkdir(RECORDINGS_DIR, { recursive: true });
         const ext = req.headers.get("content-type")?.includes("mp4") ? "mp4" : "webm";
         const path = `${RECORDINGS_DIR}/sortie-${new Date().toISOString().replaceAll(":", "-")}.${ext}`;
         await Bun.write(path, req);
@@ -45,8 +43,8 @@ const server = Bun.serve({
   websocket: {
     open(ws) {
       pilots++;
-      ws.subscribe("video");
-      ws.subscribe("status");
+      ws.subscribe(Topic.Video);
+      ws.subscribe(Topic.Status);
     },
     message(_ws, message) {
       if (typeof message !== "string") return;
@@ -62,10 +60,12 @@ const server = Bun.serve({
 
 function handle(message: CockpitMessage): void {
   switch (message.type) {
-    case "rc":
+    case "rc": {
+      const { leftRight, forwardBack, upDown, yaw } = message;
       lastRcAt = Date.now();
-      drone.rc(message);
+      drone.rc({ leftRight, forwardBack, upDown, yaw });
       return;
+    }
     case "takeoff":
       drone.takeoff();
       return;
@@ -84,9 +84,9 @@ setInterval(() => {
 
 setInterval(() => {
   const status: ServerMessage = { type: "status", drone: drone.name, battery: drone.battery() };
-  server.publish("status", JSON.stringify(status));
+  server.publish(Topic.Status, JSON.stringify(status));
 }, 1000);
 
 console.log(`cockpit: http://localhost:${server.port}  (drone: ${drone.name})`);
 
-for await (const accessUnit of drone.frames()) server.publish("video", accessUnit);
+for await (const accessUnit of drone.frames()) server.publish(Topic.Video, accessUnit);

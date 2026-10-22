@@ -1,6 +1,6 @@
-import { WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
+import { WS_PATH, type CockpitMessage, type Command, type ServerMessage } from "../shared/protocol";
 import { TARGET_IDS } from "../shared/targets";
-import { Controls, type Command } from "./controls";
+import { Controls } from "./controls";
 import { MarkerDetector, type DetectedMarker } from "./detector";
 import { drawHud, isInReticle } from "./hud";
 import { SortieRecorder } from "./recorder";
@@ -9,6 +9,9 @@ import { VideoReceiver } from "./video";
 import { XrCockpit } from "./xr";
 
 const RC_INTERVAL_MS = 50;
+const DESK_INPUT_INTERVAL_MS = 16;
+/** `?debug` shows decode/detection stats; off by default so they stay out of the sortie video. */
+const DEBUG = new URLSearchParams(location.search).has("debug");
 /** Keeps recording after landing so the sortie video shows the touchdown. */
 const RECORD_AFTER_LANDING_MS = 3000;
 
@@ -21,7 +24,7 @@ const sortie = new Sortie(TARGET_IDS);
 const detector = new MarkerDetector(canvas.width, canvas.height);
 const controls = new Controls();
 const recorder = new SortieRecorder(canvas, (path) => console.info(`recording saved to ${path}`), showError);
-const xr = new XrCockpit(canvas, (sources) => controlTick(sources), () => runCommand("land"));
+const xr = new XrCockpit(canvas, controlTick, () => runCommand("land"));
 document.body.append(xr.button());
 
 let markers: DetectedMarker[] = [];
@@ -41,11 +44,10 @@ const video = new VideoReceiver((frame) => {
     sortie: sortie.state,
     markers,
     reticle,
-    totalTargets: TARGET_IDS.length,
     battery,
     recording: recorder.recording,
-    link: linkUp ? "LINK OK" : "LINK LOST",
-    stats: `${fps}fps q${video.queueSize} det ${detector.lastMs.toFixed(0)}ms`,
+    linkUp,
+    stats: DEBUG ? { fps, decodeQueue: video.queueSize, detectMs: detector.lastMs } : null,
   });
   xr.invalidate();
   framesThisSecond++;
@@ -102,11 +104,11 @@ function runCommand(command: Command): void {
   }
 }
 
-function deskLoop(): void {
+// A timer rather than requestAnimationFrame: the browser pauses rAF for pages it considers hidden,
+// which silently stopped stick input while video kept playing. In WebXR the XR frame loop reads input.
+setInterval(() => {
   if (!xr.presenting) controlTick();
-  requestAnimationFrame(deskLoop);
-}
-requestAnimationFrame(deskLoop);
+}, DESK_INPUT_INTERVAL_MS);
 
 function showError(error: Error): void {
   console.error(error);

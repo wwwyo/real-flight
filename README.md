@@ -16,7 +16,7 @@ bun install
 bun run dev                  # cockpit on http://localhost:8080 with the simulated drone
 ```
 
-Open `http://localhost:8080` in Chrome. The simulated drone flies a camera over a flat world with the target markers, so the whole cockpit works without hardware: keys `T` take off, `W/S` up-down, `A/D` yaw, arrows forward/back/left/right, `L` land, `Space` emergency. Try WebXR on the desk with the [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) extension.
+Open `http://localhost:8080` in Chrome. The simulated drone flies a camera over a flat world with the target markers, so the whole cockpit works without hardware: keys `T` take off, `W/S` up-down, `A/D` yaw, arrows forward/back/left/right, `L` land, `Space` emergency. Add `?debug` to the URL to show frame rate, decoder queue and detection time on the HUD. Try WebXR on the desk with the [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) extension.
 
 With the real machines (a Tello, and a Quest 3 in developer mode):
 

@@ -13,6 +13,8 @@ const MARKER_PX = 150;
 /** World pixels per frame at full stick. */
 const MAX_SPEED = 24;
 
+const DICTIONARY = new AR.Dictionary(MARKER_DICTIONARY);
+
 type Pose = { x: number; y: number; zoom: number };
 
 /**
@@ -155,9 +157,8 @@ function renderWorld(): Uint8Array {
 
 /** The marker with a one-cell white quiet zone, as a MARKER_PX square grayscale bitmap. */
 function markerBitmap(id: number): Uint8Array {
-  const dictionary = new AR.Dictionary(MARKER_DICTIONARY);
-  const code = dictionary.codeList[id]!;
-  const bits = dictionary.markSize - 2;
+  const code = DICTIONARY.codeList[id]!;
+  const bits = DICTIONARY.markSize - 2;
   const cells = bits + 4;
   const bitmap = new Uint8Array(MARKER_PX * MARKER_PX);
   for (let r = 0; r < MARKER_PX; r++) {

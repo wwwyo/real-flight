@@ -61,31 +61,40 @@ export function codecFromAccessUnit(accessUnit: Uint8Array): string | null {
  * A frame is only known to be complete when the next one starts, unless the source calls flush().
  */
 export class AccessUnitSplitter {
+  /** Bytes after the last start code seen, or bytes before the first one (pendingIsNal false). */
   private pending: Uint8Array = new Uint8Array(0);
+  private pendingIsNal = false;
   private current: Uint8Array[] = [];
   private currentHasVcl = false;
 
   /** Feeds bytes and returns the access units completed by them. */
   push(chunk: Uint8Array): Uint8Array[] {
+    // Only the new bytes (plus a possibly split start code) can hold start codes not yet seen.
+    const scanFrom = Math.max(0, this.pending.length - 3);
     const data = concat([this.pending, chunk]);
-    const starts = findStartCodes(data);
+    const starts = findStartCodes(data, scanFrom);
+    if (this.pendingIsNal && starts[0] !== 0) starts.unshift(0);
     const done: Uint8Array[] = [];
     if (starts.length === 0) {
-      this.pending = data;
+      // Bytes before the first start code belong to a NAL whose start we missed; keep only what
+      // could be the beginning of a start code.
+      this.pending = data.slice(-3);
       return done;
     }
     for (let i = 0; i < starts.length - 1; i++) {
       this.addNal(data.subarray(starts[i]!, starts[i + 1]!), done);
     }
     this.pending = data.slice(starts.at(-1)!);
+    this.pendingIsNal = true;
     return done;
   }
 
   /** Treats everything received so far as the end of a frame. */
   flush(): Uint8Array[] {
     const done: Uint8Array[] = [];
-    if (this.pending.length > 0) this.addNal(this.pending, done);
+    if (this.pendingIsNal) this.addNal(this.pending, done);
     this.pending = new Uint8Array(0);
+    this.pendingIsNal = false;
     this.emit(done);
     return done;
   }
@@ -94,7 +103,7 @@ export class AccessUnitSplitter {
     if (nal.length <= startCodeLength(nal)) return;
     const type = nalType(nal);
     if (this.currentHasVcl && startsNewAccessUnit(nal, type)) this.emit(done);
-    this.current.push(nal.slice());
+    this.current.push(nal);
     if (isVcl(type)) this.currentHasVcl = true;
   }
 

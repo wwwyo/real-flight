@@ -27,8 +27,7 @@ export class Sortie {
   private endedAt = 0;
   private alive: Set<number>;
   private down: number[] = [];
-  private lockStartedAt = new Map<number, number>();
-  private lastSeenAt = new Map<number, number>();
+  private locks = new Map<number, { startedAt: number; lastSeenAt: number }>();
   private now = 0;
 
   constructor(
@@ -45,8 +44,7 @@ export class Sortie {
     this.now = now;
     this.alive = new Set(this.targetIds);
     this.down = [];
-    this.lockStartedAt.clear();
-    this.lastSeenAt.clear();
+    this.locks.clear();
   }
 
   land(now: number): void {
@@ -61,15 +59,16 @@ export class Sortie {
     if (this.phase !== "flying") return [];
     for (const id of inReticle) {
       if (!this.alive.has(id)) continue;
-      if (!this.lockStartedAt.has(id)) this.lockStartedAt.set(id, now);
-      this.lastSeenAt.set(id, now);
+      const lock = this.locks.get(id);
+      if (lock) lock.lastSeenAt = now;
+      else this.locks.set(id, { startedAt: now, lastSeenAt: now });
     }
     const shot: number[] = [];
-    for (const [id, startedAt] of this.lockStartedAt) {
-      if (now - this.lastSeenAt.get(id)! > LOCK_GRACE_MS) {
-        this.lockStartedAt.delete(id);
+    for (const [id, { startedAt, lastSeenAt }] of this.locks) {
+      if (now - lastSeenAt > LOCK_GRACE_MS) {
+        this.locks.delete(id);
       } else if (now - startedAt >= this.lockMs) {
-        this.lockStartedAt.delete(id);
+        this.locks.delete(id);
         this.alive.delete(id);
         this.down.push(id);
         shot.push(id);
@@ -84,7 +83,7 @@ export class Sortie {
 
   get state(): SortieState {
     let lock: SortieState["lock"] = null;
-    for (const [id, startedAt] of this.lockStartedAt) {
+    for (const [id, { startedAt }] of this.locks) {
       const progress = Math.min(1, (this.now - startedAt) / this.lockMs);
       if (!lock || progress > lock.progress) lock = { id, progress };
     }

@@ -30,6 +30,13 @@ describe("AccessUnitSplitter", () => {
     for (const size of [1, 2, 3, 5, 7]) expect(splitInChunks(stream, size)).toEqual(whole);
   });
 
+  test("skips bytes before the first start code, as when joining a stream mid-frame", () => {
+    const joined = new Uint8Array([0x12, 0x34, 0x56, 0x78, 0x9a, ...stream]);
+    for (const size of [1, 3, 4, joined.length]) {
+      expect(splitInChunks(joined, size)).toEqual(splitInChunks(stream, stream.length));
+    }
+  });
+
   test("holds the last picture until the next one starts or the source flushes", () => {
     const splitter = new AccessUnitSplitter();
     expect(splitter.push(new Uint8Array([...sps, ...pps, ...idr]))).toEqual([]);

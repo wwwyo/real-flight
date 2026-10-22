@@ -17,6 +17,9 @@ export type CockpitMessage =
   | { type: "land" }
   | { type: "emergency" };
 
+/** One-shot commands, i.e. every cockpit message except stick input. */
+export type Command = Exclude<CockpitMessage["type"], "rc">;
+
 export type ServerMessage = {
   type: "status";
   drone: string;
@@ -26,3 +29,5 @@ export type ServerMessage = {
 
 export const WS_PATH = "/ws";
 export const RECORDINGS_PATH = "/recordings";
+/** Server pub/sub topics every cockpit subscribes to. */
+export const Topic = { Video: "video", Status: "status" } as const;
