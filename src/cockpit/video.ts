@@ -79,6 +79,8 @@ export class VideoReceiver {
   }
 
   private decode(accessUnit: Uint8Array, key: boolean): void {
+    // Between a decoder error and its callback the decoder is already closed.
+    if (this.decoder.state !== "configured") return;
     this.decoder.decode(
       new EncodedVideoChunk({
         type: key ? "key" : "delta",

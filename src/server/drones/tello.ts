@@ -77,14 +77,29 @@ export class Tello implements Drone {
     this.commandSocket?.send(command, COMMAND_PORT, TELLO_IP);
   }
 
-  private request(command: string, timeoutMs = 5000): Promise<void> {
+  /** Retries because a reply can be lost, or answered by a stray datagram, on UDP. */
+  private async request(command: string, attempts = 3): Promise<void> {
+    for (let attempt = 1; ; attempt++) {
+      try {
+        return await this.requestOnce(command);
+      } catch (error) {
+        if (attempt >= attempts) throw error;
+      }
+    }
+  }
+
+  private requestOnce(command: string, timeoutMs = 3000): Promise<void> {
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error(`Tello did not answer "${command}"`)), timeoutMs);
-      this.replies.push((reply) => {
+      const onReply = (reply: string) => {
         clearTimeout(timer);
         if (reply === "ok") resolve();
         else reject(new Error(`Tello answered "${reply}" to "${command}"`));
-      });
+      };
+      const timer = setTimeout(() => {
+        this.replies = this.replies.filter((waiting) => waiting !== onReply);
+        reject(new Error(`Tello did not answer "${command}"`));
+      }, timeoutMs);
+      this.replies.push(onReply);
       this.send(command);
     });
   }
