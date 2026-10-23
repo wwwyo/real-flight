@@ -8,11 +8,25 @@
 
 ## QuickStart
 
-Mac、Tello、開発者モードを有効にした Quest 3、`adb` が必要。
+Mac が必要。Bun・ffmpeg・`adb` は `mise install` で入る。
 
 ```bash
 mise install
 bun install
+bun run dev                  # シミュレーターの機体で http://localhost:8080 にコックピットを起動
 ```
 
-Mac を Tello の Wi-Fi につなぎ、Quest を USB で接続して `adb reverse` を実行し、Quest のブラウザでコックピットを開く。起動コマンドは最初の機能と一緒に追加する。
+Chrome で `http://localhost:8080` を開く。シミュレーターの機体は、空・雲・山・畑の景色に標的のマーカーを置き、その中でカメラを飛ばすので、実機なしでコックピット全体を動かせる。キーは `T` 離陸、`W/S` 上昇・下降、`A/D` 旋回、矢印キーで前後左右、`L` 着陸、`Space` 非常停止。URL に `?debug` を付けると、フレームレート・デコード待ち・検出時間を HUD に表示する。WebXR は [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) 拡張で机上で試せる。
+
+最初に離陸したタブが、切断するまで操縦権を持つ。ほかのタブは閲覧だけになり、操縦タブが切断すると、閲覧タブが残っていてもドローンは着陸する。デコードされた映像が1秒以上更新されなければ、コックピットは警告を表示し、スティック入力を止めて着陸を要求する。映像がなくても着陸と非常停止は操作できる。着陸後は録画が終わる5秒後まで次の離陸を待つ。飛行中に離陸ボタンを押しても出撃はリセットされない。
+
+ローカルの確認は `bun test` と `bun run typecheck`。シミュレーターのサーバーを起動した状態で `bun run test:e2e` を実行すると、WebSocket API を通して操縦権を検証する。接続先は `REAL_FLIGHT_TEST_URL` で変更できる。サーバーが `drone: sim` と返さなければ、テストは操縦コマンドを送らずに終了する。
+
+実機（Tello と、開発者モードの Quest 3）では次のようにする。
+
+```bash
+DRONE=tello bun run start    # Mac を Tello の Wi-Fi につないだ状態で
+adb reverse tcp:8080 tcp:8080
+```
+
+Quest のブラウザで `http://localhost:8080` を開き、「Enter VR」を押す。出撃は離陸から着陸の数秒後まで録画され、Mac の `recordings/` に保存される。標的は `http://localhost:8080/markers` から印刷する。

@@ -1,5 +1,5 @@
 ---
-status: ready
+status: in-progress
 ---
 
 # 出撃 MVP

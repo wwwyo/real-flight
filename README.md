@@ -8,11 +8,25 @@ A combat game where real drones fight in real air. The pilot wears a Quest 3, se
 
 ## QuickStart
 
-Requires a Mac, a Tello, a Quest 3 with developer mode, and `adb`.
+Requires a Mac. `mise install` brings Bun, ffmpeg and `adb`.
 
 ```bash
 mise install
 bun install
+bun run dev                  # cockpit on http://localhost:8080 with the simulated drone
 ```
 
-Join the Mac to the Tello's Wi-Fi, connect the Quest over USB, run `adb reverse`, and open the cockpit in the Quest browser. Run commands are added with the first feature.
+Open `http://localhost:8080` in Chrome. The simulated drone flies a camera over sky, clouds, mountains and fields with the target markers in them, so the whole cockpit works without hardware: keys `T` take off, `W/S` up-down, `A/D` yaw, arrows forward/back/left/right, `L` land, `Space` emergency. Add `?debug` to the URL to show frame rate, decoder queue and detection time on the HUD. Try WebXR on the desk with the [Immersive Web Emulator](https://github.com/meta-quest/immersive-web-emulator) extension.
+
+The first tab to take off owns control until it disconnects; other tabs can watch. Losing that tab lands the drone even if another tab is watching. If decoded video stops for more than 1 second, the cockpit shows a warning, stops stick input and requests landing. Land and emergency remain available without video. After landing, wait for the 5-second recording tail before taking off again; pressing takeoff while airborne leaves the sortie unchanged.
+
+Run `bun test` and `bun run typecheck` for the local checks. With the simulated server running, `bun run test:e2e` checks control ownership through the WebSocket API (`REAL_FLIGHT_TEST_URL` changes the URL). It refuses to send commands unless the server reports `drone: sim`.
+
+With the real machines (a Tello, and a Quest 3 in developer mode):
+
+```bash
+DRONE=tello bun run start    # with the Mac joined to the Tello's Wi-Fi
+adb reverse tcp:8080 tcp:8080
+```
+
+Then open `http://localhost:8080` in the Quest browser and press "Enter VR". Each sortie is recorded from takeoff until a few seconds after landing and saved to `recordings/` on the Mac. Print the targets from `http://localhost:8080/markers`.
