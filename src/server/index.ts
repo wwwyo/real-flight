@@ -1,14 +1,13 @@
 import cockpit from "../cockpit/index.html";
 import markers from "../cockpit/markers.html";
-import { HOVER, parseCockpitMessage, RECORDINGS_PATH, Topic, WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
+import { parseCockpitMessage, RECORDINGS_PATH, Topic, WS_PATH, type CockpitMessage, type ServerMessage } from "../shared/protocol";
 import type { Drone } from "./drones/drone";
 import { SimDrone } from "./drones/sim";
 import { Tello } from "./drones/tello";
+import { HoverWatchdog, RC_WATCHDOG_MS } from "./hover-watchdog";
 
 const PORT = Number(process.env.PORT ?? 8080);
 const DRONES: Record<string, () => Drone> = { sim: () => new SimDrone(), tello: () => new Tello() };
-/** Without fresh stick input for this long, the drone is told to hover. */
-const RC_WATCHDOG_MS = 500;
 const RECORDINGS_DIR = "recordings";
 
 const droneName = process.env.DRONE ?? "sim";
@@ -17,7 +16,7 @@ if (!createDrone) throw new Error(`Unknown DRONE "${droneName}". Use one of: ${O
 const drone = createDrone();
 await drone.connect();
 
-let lastRcAt = 0;
+const hover = new HoverWatchdog();
 const cockpits = new Set<Bun.ServerWebSocket<unknown>>();
 let pilot: Bun.ServerWebSocket<unknown> | null = null;
 // Commanded state only; Tello acknowledgements still need validation on hardware.
@@ -84,7 +83,7 @@ const server = Bun.serve({
       drone.land();
       airborne = false;
       pilot = null;
-      lastRcAt = 0;
+      hover.reset();
       for (const cockpit of cockpits) sendRole(cockpit);
     },
   },
@@ -98,7 +97,7 @@ function sendRole(ws: Bun.ServerWebSocket<unknown>): void {
 function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void {
   if (message.type === "rc") {
     if (ws === pilot && airborne) {
-      lastRcAt = Date.now();
+      hover.noteInput(Date.now());
       drone.rc(message);
     }
     return;
@@ -112,7 +111,7 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
     case "takeoff":
       pilot = ws;
       airborne = true;
-      lastRcAt = Date.now();
+      hover.noteInput(Date.now());
       for (const cockpit of cockpits) sendRole(cockpit);
       drone.takeoff();
       break;
@@ -128,8 +127,13 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
   ws.send(JSON.stringify({ type: "command", command: message.type, accepted } satisfies ServerMessage));
 }
 
+/**
+ * Holds the drone until the cockpit has flown it, and stops talking once the cockpit goes quiet, so the
+ * drone's own failsafe lands it instead of a hover that never ends (ADR 0002).
+ */
 setInterval(() => {
-  if (Date.now() - lastRcAt > RC_WATCHDOG_MS) drone.rc(HOVER);
+  const input = hover.next(Date.now(), airborne);
+  if (input) drone.rc(input);
 }, RC_WATCHDOG_MS);
 
 setInterval(() => {
