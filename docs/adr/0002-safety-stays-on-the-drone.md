@@ -1,6 +1,8 @@
 # The drone lands itself; the relay only cancels stale stick input
 
-When the cockpit that is flying the drone stops sending stick input while its WebSocket stays open — a tab the browser froze, a hung renderer — the relay cancels the last `rc` setpoint once and then sends nothing. It does not land the drone. Tello lands on its own after 15 s without a command, and a relay that sends `rc 0 0 0 0` every 500 ms never lets that timer run, so the drone hovers until the battery dies. Silence is the one thing a dead relay and a frozen cockpit both produce, so handing the link to the drone's own failsafe covers both, and the relay only has to stop talking. Either way the drone ends up hearing silence and applying its own policy, so the relay no longer has to know which failures the drone can see.
+When the cockpit that is flying the drone stops sending stick input while its WebSocket stays open — a tab the browser froze, a hung renderer — the relay cancels the last `rc` setpoint a few times and then sends nothing. It does not land the drone. Tello lands on its own after 15 s without a command, and a relay that sends `rc 0 0 0 0` every 500 ms never lets that timer run, so the drone hovers until the battery dies. Silence is the one thing a dead relay and a frozen cockpit both produce, so handing the link to the drone's own failsafe covers both, and the relay only has to stop talking. Either way the drone ends up hearing silence and applying its own policy, so the relay no longer has to know which failures the drone can see.
+
+The cancel is repeated (three sends, about a second) because Tello takes `rc` over UDP with no retry: one lost datagram would leave the last setpoint — a stick held forward — on until the failsafe lands the drone. A whole second of hovers barely shortens the 15 s the failsafe waits.
 
 The cockpit keeps its own landing when decoded video stops for more than a second: the relay would still be flying the drone, so the drone cannot notice, and a pilot without the view cannot fly.
 
@@ -8,7 +10,7 @@ The cockpit keeps its own landing when decoded video stops for more than a secon
 
 - **Land from the relay or the app when input goes stale** (asked for in review on PR #4): a second landing implementation in the part that is misbehaving in the case that matters, racing the drone's own failsafe. Rejected for the same reason ADR 0001 keeps the relay thin.
 - **Keep sending hover while input is stale** (what the MVP shipped): the last setpoint is cancelled, but the command stream keeps the drone's 15 s timer from expiring, so a frozen cockpit leaves the drone hovering.
-- **Stop at the first silence and let the drone decide** (chosen): one hover cancels the setpoint, then quiet; the drone's failsafe lands it on a dead relay and a frozen cockpit alike.
+- **Stop at the first silence and let the drone decide** (chosen): a few hovers cancel the setpoint, then quiet; the drone's failsafe lands it on a dead relay and a frozen cockpit alike.
 
 ## Evidence
 
