@@ -118,10 +118,12 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
     case "land":
       airborne = false;
       drone.land();
+      hover.reset();
       break;
     case "emergency":
       airborne = false;
       drone.emergency();
+      hover.reset();
       break;
   }
   ws.send(JSON.stringify({ type: "command", command: message.type, accepted } satisfies ServerMessage));
@@ -132,7 +134,7 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
  * drone's own failsafe lands it instead of a hover that never ends (ADR 0002).
  */
 setInterval(() => {
-  const input = hover.next(Date.now(), airborne);
+  const input = hover.next(Date.now());
   if (input) drone.rc(input);
 }, RC_WATCHDOG_MS);
 
