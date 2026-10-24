@@ -6,6 +6,8 @@ status: in-progress
 
 [日本語](prd.ja.md)
 
+Design: [dd.md](dd.md) — target size and detection range, and what the pilot sees when a marker is missed.
+
 ## Problem
 
 REAL FLIGHT is pitched as an IP where real machines fight in real air, but nothing yet shows that a pilot in a Quest 3 can aim a real drone, that a virtual lock-on feels like a fight, or that the result is worth watching. The TCIC IP INNOVATION AWARDS 2026 application (deadline 10/29 17:00) needs that evidence as a sortie video by 10/26.
