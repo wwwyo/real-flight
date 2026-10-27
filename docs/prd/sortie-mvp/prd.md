@@ -54,7 +54,7 @@ Terms follow the [Glossary](../../../AGENTS.md#glossary).
 
 ## Non-Functional Requirements
 
-- Safety: the pilot can stop the drone at any moment with one controller button, and the drone does not keep flying once the cockpit or relay link drops.
+- Safety: the pilot can stop the drone at any moment with one controller button, and the drone does not keep flying once the cockpit or relay link drops: it stops moving, waits briefly for the pilot to reconnect, and lands if the link does not come back.
 - Swappability: Tello-specific code stays behind the drone adapter.
 - Privacy: the repo is public. Recordings and raw video stay out of it.
 

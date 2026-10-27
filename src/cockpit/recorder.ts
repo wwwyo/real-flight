@@ -24,6 +24,7 @@ export class SortieRecorder {
     const recorder = new MediaRecorder(stream, { mimeType });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (event) => chunks.push(event.data);
+    recorder.onerror = () => this.onError(new Error("録画が止まりました（MediaRecorder のエラー）"));
     recorder.onstop = () => {
       for (const track of stream.getTracks()) track.stop();
       void this.upload(new Blob(chunks, { type: recorder.mimeType }));

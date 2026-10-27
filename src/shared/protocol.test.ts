@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { parseCockpitMessage } from "./protocol";
+import { MAX_LOG_TEXT, parseCockpitMessage } from "./protocol";
 
 describe("parseCockpitMessage", () => {
   test("accepts commands and stick input", () => {
@@ -21,6 +21,22 @@ describe("parseCockpitMessage", () => {
       upDown: 13,
       yaw: 0,
     });
+  });
+
+  test("accepts flat cockpit logs within the size limit", () => {
+    expect(parseCockpitMessage('{"type":"log","event":"video-stall","data":{"ms":1200,"reason":null}}')).toEqual({
+      type: "log",
+      event: "video-stall",
+      data: { ms: 1200, reason: null },
+    });
+    for (const text of [
+      '{"type":"log","event":"Bad Event","data":{}}',
+      '{"type":"log","event":"stats","data":{"nested":{"a":1}}}',
+      '{"type":"log","event":"stats","data":[]}',
+      `{"type":"log","event":"stats","data":{"pad":"${"x".repeat(MAX_LOG_TEXT)}"}}`,
+    ]) {
+      expect(parseCockpitMessage(text)).toBeNull();
+    }
   });
 
   test("rejects anything else", () => {
