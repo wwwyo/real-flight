@@ -71,7 +71,7 @@ The Quest 3 reaches the Mac over USB: `adb reverse tcp:<port> tcp:<port>`, then 
 ## Skills
 
 - Read `docs/adr/` before changing where decoding, lock-on or recording runs, or what the relay sends when cockpit input stops
-- Measured latency and Quest browser quirks go into `.agents/skills/<topic>/` once found
+- For Tello video latency and hardware observations, read [tello-video](.agents/skills/tello-video/SKILL.md); add Quest browser evidence there once measured.
 
 ## Review
 
