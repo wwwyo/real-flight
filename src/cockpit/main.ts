@@ -161,6 +161,8 @@ function connect(): void {
         if (message.command === "takeoff") {
           takeoffPending = false;
           if (message.accepted) {
+            // A refusal from an earlier attempt no longer applies.
+            errorBox.textContent = "";
             clearTimeout(stopRecordingTimer);
             sortie.takeoff(performance.now());
             recorder.start();
