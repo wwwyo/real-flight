@@ -1,9 +1,9 @@
 import { HOVER, VIDEO_TIMEOUT_MS, WS_PATH, type CockpitMessage, type Command, type ControlRole, type LogData, type RcInput, type ServerMessage } from "../shared/protocol";
 import { TARGET_IDS } from "../shared/targets";
 import { COMMAND_LABELS, Controls, describeRc } from "./controls";
-import { MarkerDetector } from "./detector";
-import { TargetLayer } from "./target-layer";
-import { drawHud, isInReticle } from "./hud";
+import { MarkerDetector, type DetectedMarker } from "./detector";
+import { onTorso, TargetLayer } from "./target-layer";
+import { drawHud } from "./hud";
 import { SortieRecorder } from "./recorder";
 import { Sortie } from "./sortie";
 import { VideoReceiver } from "./video";
@@ -54,6 +54,8 @@ let framesThisSecond = 0;
 let stick: RcInput = HOVER;
 let sentRc: RcInput | null = null;
 let commandNote: { text: string; at: number } | null = null;
+/** The targets on screen, including ones just missed by detection: what the pilot can shoot at. */
+let shownMarkers: DetectedMarker[] = [];
 /** Longest time a frame spent in the decoder since the last stats log; chunks are stamped with performance.now(). */
 let maxDecodeMs = 0;
 let fps = 0;
@@ -87,21 +89,37 @@ function sentLines(now: number): string[] {
   return lines;
 }
 
+/** The live target under the reticle's centre, judged on the view the pilot sees. */
+function aimedTarget(): number | null {
+  const alive = new Set(sortie.state.remaining);
+  return shownMarkers.find((m) => alive.has(m.id) && onTorso(m, reticle))?.id ?? null;
+}
+
+function shoot(now: number): void {
+  const result = sortie.fire(now, aimedTarget());
+  if (!result) return;
+  if (result.shotDown && result.hit !== null) targets.explode(result.hit, now);
+  logEvent("shot", { hit: result.hit, shotDown: result.shotDown });
+  render();
+}
+
 function render(shown = targets.track([], performance.now())): void {
   const now = performance.now();
+  shownMarkers = shown;
   ctx.drawImage(rawView, 0, 0);
   targets.draw(ctx, shown, sortie.state, now);
   drawHud(ctx, {
     sortie: sortie.state,
     markers: shown,
     reticle,
+    aimed: aimedTarget() !== null,
     battery,
     recording: recorder.recording,
     linkUp,
     warning: warningFor(now),
     sent: sentLines(now),
     stats: DEBUG ? { fps, decodeQueue: video.queueSize, detectMs: detector.lastMs } : null,
-  });
+  }, now);
   xr.invalidate();
 }
 
@@ -123,10 +141,8 @@ const video = new VideoReceiver((frame) => {
   }
   const markers = detector.detect(rawView).filter((m) => targetIds.has(m.id));
   const now = performance.now();
-  const shown = targets.track(markers, now);
-  const shotDown = sortie.update(now, markers.filter((m) => isInReticle(m.center, reticle)).map((m) => m.id));
-  for (const id of shotDown) targets.explode(id, now);
-  render(shown);
+  sortie.update(now);
+  render(targets.track(markers, now));
   framesThisSecond++;
 }, (error) => {
   logEvent("decoder-error", { message: error.message });
@@ -199,10 +215,11 @@ let lastRcAt = 0;
 let stopRecordingTimer: ReturnType<typeof setTimeout> | undefined;
 
 function controlTick(xrSources?: XRInputSourceArray): void {
-  const { rc, commands } = controls.read(xrSources);
+  const { rc, commands, fire } = controls.read(xrSources);
   stick = rc;
   for (const command of commands) runCommand(command);
   const now = performance.now();
+  if (fire && sortie.canFire(now)) shoot(now);
   if (now - lastRcAt >= RC_INTERVAL_MS) {
     sentRc = null;
     if (role === "pilot") {
@@ -267,7 +284,7 @@ setInterval(() => {
     stalledSince = lastFrameAt;
     logEvent("video-stall", { airborne: sortie.airborne, decodeQueue: video.queueSize });
   }
-  sortie.update(performance.now(), []);
+  sortie.update(performance.now());
   render();
 }, STALL_CHECK_INTERVAL_MS);
 

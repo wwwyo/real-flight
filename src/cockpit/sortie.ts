@@ -5,21 +5,26 @@ export type SortieState = {
   elapsedMs: number;
   remaining: number[];
   shotDown: number[];
-  /** The target closest to being shot down, if any is locked. */
-  lock: { id: number; progress: number } | null;
+  /** Hits taken by each target still alive; a target missing here has not been hit. */
+  hits: Record<number, number>;
+  shots: number;
+  /** Shots that hit a target, for the hit rate after landing. */
+  shotsHit: number;
+  /** The latest shot, for the muzzle flash and hit marker; null before the first one. */
+  lastShot: { at: number; hit: number | null } | null;
 };
 
-/** Initial lock duration from the PRD; tuned by feel. */
-export const DEFAULT_LOCK_MS = 1000;
-/**
- * A lock survives detection dropouts this short. Not resetting on a single missed frame,
- * because ArUco misses markers on blurry frames even while the target stays in the reticle.
- */
-export const LOCK_GRACE_MS = 200;
+/** Hits a target takes before it is shot down. */
+export const HITS_TO_SHOOT_DOWN = 3;
+/** Holding fire shoots once per interval; unlimited ammunition. */
+export const FIRE_INTERVAL_MS = 300;
+
+export type ShotResult = { hit: number | null; shotDown: boolean } | null;
 
 /**
- * One sortie: from takeoff until every target is shot down or the drone lands.
- * A target is shot down once it stays inside the reticle for the lock duration.
+ * One sortie: from takeoff until every target is shot down or the drone lands. The pilot fires at
+ * whatever is under the reticle's centre in the view they see, so video latency does not make a hit
+ * unfair: the shot is judged on the same frame the pilot aimed at.
  */
 export class Sortie {
   private phase: Phase = "ready";
@@ -27,13 +32,13 @@ export class Sortie {
   private endedAt = 0;
   private alive: Set<number>;
   private down: number[] = [];
-  private locks = new Map<number, { startedAt: number; lastSeenAt: number }>();
+  private hits = new Map<number, number>();
+  private shots = 0;
+  private shotsHit = 0;
+  private lastShot: SortieState["lastShot"] = null;
   private now = 0;
 
-  constructor(
-    private readonly targetIds: readonly number[],
-    private readonly lockMs = DEFAULT_LOCK_MS,
-  ) {
+  constructor(private readonly targetIds: readonly number[]) {
     this.alive = new Set(targetIds);
   }
 
@@ -50,59 +55,65 @@ export class Sortie {
     this.now = now;
     this.alive = new Set(this.targetIds);
     this.down = [];
-    this.locks.clear();
+    this.hits.clear();
+    this.shots = this.shotsHit = 0;
+    this.lastShot = null;
   }
 
   land(now: number): void {
     if (!this.airborne) return;
     if (this.phase === "flying") this.endedAt = now;
     this.phase = "landed";
-    this.locks.clear();
   }
 
-  /** Advances time with the targets seen inside the reticle on this frame; returns ids shot down now. */
-  update(now: number, inReticle: Iterable<number>): number[] {
+  /** Advances the clock. */
+  update(now: number): void {
     this.now = now;
-    if (this.phase !== "flying") return [];
-    // Expire before refreshing detections: a frame gap must not count as time spent aiming.
-    for (const [id, lock] of this.locks) {
-      if (now - lock.lastSeenAt > LOCK_GRACE_MS) this.locks.delete(id);
+  }
+
+  /** Whether a held trigger would fire now; false while flying is over or the gun is cycling. */
+  canFire(now: number): boolean {
+    return this.phase === "flying" && (!this.lastShot || now - this.lastShot.at >= FIRE_INTERVAL_MS);
+  }
+
+  /**
+   * Fires at the target under the reticle's centre (null for none). Returns null when no shot was
+   * fired, otherwise what it hit and whether that shot it down.
+   */
+  fire(now: number, aimedAt: number | null): ShotResult {
+    this.now = now;
+    if (!this.canFire(now)) return null;
+    this.shots++;
+    const hit = aimedAt !== null && this.alive.has(aimedAt) ? aimedAt : null;
+    this.lastShot = { at: now, hit };
+    if (hit === null) return { hit: null, shotDown: false };
+    this.shotsHit++;
+    const taken = (this.hits.get(hit) ?? 0) + 1;
+    if (taken < HITS_TO_SHOOT_DOWN) {
+      this.hits.set(hit, taken);
+      return { hit, shotDown: false };
     }
-    for (const id of inReticle) {
-      if (!this.alive.has(id)) continue;
-      const lock = this.locks.get(id);
-      if (lock) lock.lastSeenAt = now;
-      else this.locks.set(id, { startedAt: now, lastSeenAt: now });
-    }
-    const shot: number[] = [];
-    for (const [id, { startedAt }] of this.locks) {
-      if (now - startedAt >= this.lockMs) {
-        this.locks.delete(id);
-        this.alive.delete(id);
-        this.down.push(id);
-        shot.push(id);
-      }
-    }
+    this.hits.delete(hit);
+    this.alive.delete(hit);
+    this.down.push(hit);
     if (this.alive.size === 0) {
       this.phase = "complete";
       this.endedAt = now;
     }
-    return shot;
+    return { hit, shotDown: true };
   }
 
   get state(): SortieState {
-    let lock: SortieState["lock"] = null;
-    for (const [id, { startedAt }] of this.locks) {
-      const progress = Math.min(1, (this.now - startedAt) / this.lockMs);
-      if (!lock || progress > lock.progress) lock = { id, progress };
-    }
     const end = this.phase === "flying" ? this.now : this.endedAt;
     return {
       phase: this.phase,
       elapsedMs: this.phase === "ready" ? 0 : end - this.startedAt,
       remaining: [...this.alive],
       shotDown: [...this.down],
-      lock,
+      hits: Object.fromEntries(this.hits),
+      shots: this.shots,
+      shotsHit: this.shotsHit,
+      lastShot: this.lastShot,
     };
   }
 }

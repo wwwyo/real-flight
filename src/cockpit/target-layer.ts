@@ -1,11 +1,18 @@
 import type { DetectedMarker } from "./detector";
-import { LOCK_GRACE_MS, type SortieState } from "./sortie";
+import type { SortieState } from "./sortie";
 
 export type Box = { left: number; top: number; right: number; bottom: number };
 type Point = { x: number; y: number };
 type Affine = { a: Point; b: Point; origin: Point };
 
 const EXPLOSION_MS = 700;
+/** How long a hit target flashes. */
+const HIT_FLASH_MS = 150;
+/**
+ * A robot stays drawn this long after its marker was last found, so one blurry frame does not flash
+ * the bare pattern through; it can still be shot meanwhile, since the pilot sees it.
+ */
+export const TRACK_GRACE_MS = 200;
 
 /**
  * A target is shown as an enemy robot, in sprite units where the detected marker spans (100,130)–(200,230).
@@ -52,6 +59,16 @@ const ROBOT_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${SPRITE.x} 
   </g>
 </svg>`;
 
+/** The robot's torso in sprite units, the part a shot has to land on. */
+const TORSO: readonly Point[] = [
+  { x: 70, y: 100 },
+  { x: 230, y: 100 },
+  { x: 244, y: 170 },
+  { x: 222, y: 264 },
+  { x: 78, y: 264 },
+  { x: 56, y: 170 },
+];
+
 /** Maps sprite units onto the marker's plane, so the robot follows its tilt and distance. */
 function spriteAffine(marker: DetectedMarker): Affine {
   const [c0, c1, , c3] = marker.corners as [Point, Point, Point, Point];
@@ -69,6 +86,24 @@ function spriteAffine(marker: DetectedMarker): Affine {
 
 function toScreen({ a, b, origin }: Affine, u: number, v: number): Point {
   return { x: origin.x + u * a.x + v * b.x, y: origin.y + u * a.y + v * b.y };
+}
+
+/** Whether a screen point lies on the torso of the robot drawn over the marker. */
+export function onTorso(marker: DetectedMarker, point: Point): boolean {
+  const { a, b, origin } = spriteAffine(marker);
+  const det = a.x * b.y - a.y * b.x;
+  if (Math.abs(det) < 1e-9) return false;
+  const dx = point.x - origin.x;
+  const dy = point.y - origin.y;
+  const u = (dx * b.y - dy * b.x) / det;
+  const v = (a.x * dy - a.y * dx) / det;
+  let inside = false;
+  for (let i = 0, j = TORSO.length - 1; i < TORSO.length; j = i++) {
+    const p = TORSO[i]!;
+    const q = TORSO[j]!;
+    if (p.y > v !== q.y > v && u < ((q.x - p.x) * (v - p.y)) / (q.y - p.y) + p.x) inside = !inside;
+  }
+  return inside;
 }
 
 /** The screen box around the robot drawn on a marker, for placing its HUD label. */
@@ -113,7 +148,7 @@ export class TargetLayer {
   track(markers: DetectedMarker[], now: number): DetectedMarker[] {
     for (const marker of markers) this.lastSeen.set(marker.id, { marker, at: now });
     for (const [id, seen] of this.lastSeen) {
-      if (now - seen.at > LOCK_GRACE_MS) this.lastSeen.delete(id);
+      if (now - seen.at > TRACK_GRACE_MS) this.lastSeen.delete(id);
     }
     return [...this.lastSeen.values()].map((seen) => seen.marker);
   }
@@ -142,6 +177,12 @@ export class TargetLayer {
         ctx.translate(-WRECK_PIVOT.x, -WRECK_PIVOT.y);
       }
       ctx.drawImage(down ? this.sprites.wreck : this.sprites.alive, SPRITE.x, SPRITE.y, SPRITE.width, SPRITE.height);
+      const shot = sortie.lastShot;
+      if (!down && shot?.hit === marker.id && now - shot.at < HIT_FLASH_MS) {
+        ctx.globalAlpha = 0.6 * (1 - (now - shot.at) / HIT_FLASH_MS);
+        ctx.globalCompositeOperation = "lighter";
+        ctx.drawImage(this.sprites.alive, SPRITE.x, SPRITE.y, SPRITE.width, SPRITE.height);
+      }
       ctx.restore();
     }
     for (const [id, explosion] of this.explosions) {
