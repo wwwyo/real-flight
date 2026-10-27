@@ -103,6 +103,8 @@ const server = Bun.serve({
       // The watchdog cancels the last stick input as it would for a silent pilot, so the drone hovers
       // while the pilot reopens the cockpit; landing at once would end the sortie over a dropped cable.
       log.event("relay", "pilot-lost", { landInMs: RECLAIM_MS });
+      clearTimeout(reclaimTimer);
+      // Re-checks the state when it fires, so a landing never reaches a drone someone took back.
       reclaimTimer = setTimeout(() => {
         if (pilot || !airborne) return;
         log.event("relay", "pilot-not-back", { afterMs: RECLAIM_MS });
