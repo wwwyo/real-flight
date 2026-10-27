@@ -31,16 +31,17 @@ function font(px: number, unit: number, weight = 600): string {
   return `${weight} ${px * unit}px ui-monospace, Menlo, "Hiragino Sans", monospace`;
 }
 
-/** Draws the instruments over the video already on the canvas. */
-export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo, now: number): void {
-  const { width, height } = ctx.canvas;
+/**
+ * Draws what belongs to the view itself over the video already on the canvas: target brackets, the
+ * reticle and shot effects. In XR these sit at the video's depth, so the eyes converge on the target
+ * and the reticle together, as a collimated gunsight would.
+ */
+export function drawSight(ctx: CanvasRenderingContext2D, hud: HudInfo, now: number): void {
   const { sortie, reticle } = hud;
-  const unit = height / 720;
+  const unit = ctx.canvas.height / 720;
   ctx.save();
   ctx.lineWidth = 3 * unit;
   ctx.font = font(22, unit);
-  ctx.textBaseline = "top";
-
   ctx.textAlign = "center";
   ctx.textBaseline = "bottom";
   for (const marker of hud.markers) {
@@ -52,8 +53,6 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo, now: number
     const label = down ? "DOWN" : `TGT ${marker.id} ${"■".repeat(left)}${"□".repeat(HITS_TO_SHOOT_DOWN - left)}`;
     text(ctx, label, (box.left + box.right) / 2, box.top - 6 * unit);
   }
-  ctx.textAlign = "left";
-  ctx.textBaseline = "top";
 
   ctx.strokeStyle = hud.aimed ? RED : GREEN;
   ctx.beginPath();
@@ -64,6 +63,22 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo, now: number
   ctx.lineTo(reticle.x, reticle.y + 12 * unit);
   ctx.stroke();
   drawShot(ctx, sortie.lastShot, reticle, unit, now);
+  ctx.restore();
+}
+
+/**
+ * Draws the readouts around the edge on a transparent canvas. In XR they float nearer than the
+ * video, which is what gives the flat camera picture depth.
+ */
+export function drawInstruments(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
+  const { width, height } = ctx.canvas;
+  const { sortie } = hud;
+  const unit = height / 720;
+  ctx.save();
+  ctx.lineWidth = 3 * unit;
+  ctx.font = font(22, unit);
+  ctx.textAlign = "left";
+  ctx.textBaseline = "top";
 
   ctx.fillStyle = GREEN;
   const pad = 24 * unit;

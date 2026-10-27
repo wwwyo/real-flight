@@ -3,7 +3,7 @@ import { TARGET_IDS } from "../shared/targets";
 import { COMMAND_LABELS, Controls, describeRc } from "./controls";
 import { MarkerDetector, type DetectedMarker } from "./detector";
 import { onTorso, TargetLayer } from "./target-layer";
-import { drawHud } from "./hud";
+import { drawInstruments, drawSight, type HudInfo } from "./hud";
 import { SortieRecorder } from "./recorder";
 import { Sortie } from "./sortie";
 import { VideoReceiver } from "./video";
@@ -26,6 +26,11 @@ const ctx = canvas.getContext("2d")!;
 // Keep the last raw view so warnings can be redrawn in XR and recordings without new video.
 const rawView = new OffscreenCanvas(canvas.width, canvas.height);
 const rawCtx = rawView.getContext("2d")!;
+/** The view at the video's depth in XR, and the readouts in front of it; the canvas shows both stacked. */
+const sightView = layerLike(canvas);
+const instrumentsView = layerLike(canvas);
+const sightCtx = sightView.getContext("2d")!;
+const instrumentsCtx = instrumentsView.getContext("2d")!;
 const reticle = { x: canvas.width / 2, y: canvas.height / 2, radius: canvas.height * 0.11 };
 
 const targetIds = new Set<number>(TARGET_IDS);
@@ -36,7 +41,7 @@ const controls = new Controls();
 const recorder = new SortieRecorder(canvas, (path) => console.info(`recording saved to ${path}`), showError);
 /** Set while the error box shows a video error, which the next decoded frame clears. */
 let videoErrorShown = false;
-const xr = new XrCockpit(canvas, controlTick, () => {
+const xr = new XrCockpit(sightView, instrumentsView, controlTick, () => {
   logEvent("xr-end");
   runCommand("land");
 });
@@ -106,9 +111,7 @@ function shoot(now: number): void {
 function render(shown = targets.track([], performance.now())): void {
   const now = performance.now();
   shownMarkers = shown;
-  ctx.drawImage(rawView, 0, 0);
-  targets.draw(ctx, shown, sortie.state, now);
-  drawHud(ctx, {
+  const hud: HudInfo = {
     sortie: sortie.state,
     markers: shown,
     reticle,
@@ -119,7 +122,14 @@ function render(shown = targets.track([], performance.now())): void {
     warning: warningFor(now),
     sent: sentLines(now),
     stats: DEBUG ? { fps, decodeQueue: video.queueSize, detectMs: detector.lastMs } : null,
-  }, now);
+  };
+  sightCtx.drawImage(rawView, 0, 0);
+  targets.draw(sightCtx, shown, sortie.state, now);
+  drawSight(sightCtx, hud, now);
+  instrumentsCtx.clearRect(0, 0, instrumentsView.width, instrumentsView.height);
+  drawInstruments(instrumentsCtx, hud);
+  ctx.drawImage(sightView, 0, 0);
+  ctx.drawImage(instrumentsView, 0, 0);
   xr.invalidate();
 }
 
@@ -317,4 +327,11 @@ function showError(error: Error): void {
   videoErrorShown = false;
   console.error(error);
   errorBox.textContent = error.message;
+}
+
+function layerLike(source: HTMLCanvasElement): HTMLCanvasElement {
+  const layer = document.createElement("canvas");
+  layer.width = source.width;
+  layer.height = source.height;
+  return layer;
 }
