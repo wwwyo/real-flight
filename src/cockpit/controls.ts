@@ -27,6 +27,8 @@ export class Controls {
     });
     window.addEventListener("keyup", (event) => this.keys.delete(event.code));
     window.addEventListener("blur", () => this.keys.clear());
+    // The Quest is flown with Touch controllers, and a focused field could bring up its keyboard.
+    if (!navigator.userAgent.includes("OculusBrowser")) keepKeysFromExtensions();
   }
 
   /** Samples input once per frame; a command fires on the press, not while held. */
@@ -83,6 +85,46 @@ export class Controls {
       commands,
     };
   }
+}
+
+/**
+ * Keyboard extensions such as Vimium take letter keys (T opens a tab) before the page sees them, but
+ * leave keys alone while an editable element has focus. A hidden textarea holds focus so the keys reach
+ * the cockpit. Keys are read by `event.code`, so text the IME composes there does not matter; it is
+ * cleared as it arrives.
+ */
+function keepKeysFromExtensions(): void {
+  const sink = document.createElement("textarea");
+  sink.setAttribute("aria-hidden", "true");
+  sink.tabIndex = -1;
+  sink.inputMode = "none";
+  sink.autocomplete = "off";
+  sink.spellcheck = false;
+  Object.assign(sink.style, { position: "fixed", left: "0", top: "0", width: "1px", height: "1px", opacity: "0", pointerEvents: "none" });
+  document.body.append(sink);
+  const clear = () => (sink.value = "");
+  sink.addEventListener("input", clear);
+  sink.addEventListener("compositionend", clear);
+  // Clicking a button (Enter VR) moves focus away; take it back once the click has happened.
+  const refocus = () => setTimeout(() => sink.focus({ preventScroll: true }), 0);
+  sink.addEventListener("blur", refocus);
+  window.addEventListener("focus", refocus);
+  sink.focus({ preventScroll: true });
+}
+
+export const COMMAND_LABELS: Record<Command, string> = { takeoff: "離陸", land: "着陸", emergency: "緊急停止" };
+
+/** Stick input in the pilot's words, e.g. "右旋回 40% / 前進 60%"; values are percent of the drone's top speed. */
+export function describeRc({ leftRight, forwardBack, upDown, yaw }: RcInput): string {
+  const parts = [
+    [yaw, "右旋回", "左旋回"],
+    [forwardBack, "前進", "後退"],
+    [leftRight, "右移動", "左移動"],
+    [upDown, "上昇", "下降"],
+  ] as const;
+  const moving = parts.filter(([value]) => value !== 0);
+  if (moving.length === 0) return "ホバリング";
+  return moving.map(([value, plus, minus]) => `${value > 0 ? plus : minus} ${Math.abs(value)}%`).join(" / ");
 }
 
 function toRc(axis: number): number {

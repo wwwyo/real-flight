@@ -12,6 +12,8 @@ export type HudInfo = {
   recording: boolean;
   linkUp: boolean;
   warning: string | null;
+  /** What the cockpit sent to the drone, bottom right, so the pilot can tell input from drone behavior. */
+  sent: string[];
   /** Decode and detection numbers for tuning; null hides them. */
   stats: { fps: number; decodeQueue: number; detectMs: number } | null;
 };
@@ -91,10 +93,17 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
     text(ctx, "● REC", width - pad, pad + line * 2);
   }
 
+  ctx.fillStyle = GREEN;
+  ctx.font = font(18, unit, 500);
+  ctx.textBaseline = "bottom";
+  const sentLine = 24 * unit;
+  hud.sent.forEach((sent, i) => text(ctx, sent, width - pad, height - pad - (hud.sent.length - 1 - i) * sentLine));
+  ctx.textBaseline = "top";
+
   ctx.textAlign = "center";
   if (hud.warning) {
     ctx.fillStyle = RED;
-    ctx.font = font(22, unit);
+    ctx.font = font(30, unit);
     text(ctx, hud.warning, width / 2, height - 130 * unit);
   }
   ctx.font = font(28, unit);

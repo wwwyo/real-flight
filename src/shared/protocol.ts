@@ -13,17 +13,25 @@ export type RcInput = {
 
 export const HOVER: RcInput = { leftRight: 0, forwardBack: 0, upDown: 0, yaw: 0 };
 
+/** Flat values a cockpit log entry may carry. */
+export type LogData = Record<string, string | number | boolean | null>;
+
 export type CockpitMessage =
   | ({ type: "rc" } & RcInput)
   | { type: "takeoff" }
   | { type: "land" }
-  | { type: "emergency" };
+  | { type: "emergency" }
+  /** What the cockpit saw, written to the Mac's link log so a session can be read back afterwards. */
+  | { type: "log"; event: string; data: LogData };
 
-/** One-shot commands, i.e. every cockpit message except stick input. */
-export type Command = Exclude<CockpitMessage["type"], "rc">;
+/** One-shot drone commands: every cockpit message except stick input and logs. */
+export type Command = Exclude<CockpitMessage["type"], "rc" | "log">;
 
 const COMMANDS: readonly string[] = ["takeoff", "land", "emergency"] satisfies Command[];
 const RC_AXES = ["leftRight", "forwardBack", "upDown", "yaw"] as const;
+/** Keeps a page that floods the socket from filling the Mac's disk through the log. */
+export const MAX_LOG_TEXT = 2048;
+const LOG_EVENT = /^[a-z][a-z0-9-]{0,47}$/;
 
 /**
  * Reads a cockpit message from untrusted WebSocket text. Returns null for anything malformed;
@@ -39,11 +47,20 @@ export function parseCockpitMessage(text: string): CockpitMessage | null {
   if (typeof value !== "object" || value === null || !("type" in value)) return null;
   const { type } = value;
   if (typeof type === "string" && COMMANDS.includes(type)) return { type: type as Command };
+  if (type === "log") return text.length <= MAX_LOG_TEXT ? parseLog(value) : null;
   if (type !== "rc") return null;
   const rc = value as Record<string, unknown>;
   if (!RC_AXES.every((axis) => typeof rc[axis] === "number" && Number.isFinite(rc[axis]))) return null;
   const axis = (name: (typeof RC_AXES)[number]) => Math.max(-100, Math.min(100, Math.round(rc[name] as number)));
   return { type: "rc", leftRight: axis("leftRight"), forwardBack: axis("forwardBack"), upDown: axis("upDown"), yaw: axis("yaw") };
+}
+
+function parseLog(value: object): CockpitMessage | null {
+  const { event, data } = value as Record<string, unknown>;
+  if (typeof event !== "string" || !LOG_EVENT.test(event)) return null;
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  const flat = Object.values(data).every((v) => v === null || ["string", "number", "boolean"].includes(typeof v));
+  return flat ? { type: "log", event, data: data as LogData } : null;
 }
 
 export type ControlRole = "available" | "pilot" | "observer";

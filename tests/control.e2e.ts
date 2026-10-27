@@ -50,10 +50,12 @@ test("only the cockpit that takes off owns control, and its disconnect releases 
     expect(await second.command("emergency")).toBe(false);
     expect(await first.command("takeoff")).toBe(false);
 
+    // The owner's drone keeps hovering after its disconnect, and take-off from another cockpit takes it back.
     first.close();
     await expect.poll(() => second.role).toBe("available");
-    // A stale airborne flag would refuse this; the relay must land on the owner's disconnect.
     expect(await second.command("takeoff")).toBe(true);
+    await expect.poll(() => second.role).toBe("pilot");
+    expect(await second.command("takeoff")).toBe(false);
     expect(await second.command("land")).toBe(true);
     expect(await second.command("takeoff")).toBe(true);
     expect(await second.command("emergency")).toBe(true);

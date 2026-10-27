@@ -14,6 +14,8 @@ export class VideoReceiver {
   private decoder: VideoDecoder;
   /** "waiting-key": configured, but skipping frames until the next key frame. */
   private state: "unconfigured" | "configuring" | "waiting-key" | "decoding" = "unconfigured";
+  private skipped = 0;
+  private errors = 0;
 
   constructor(
     private readonly onFrame: (frame: VideoFrame) => void,
@@ -27,6 +29,7 @@ export class VideoReceiver {
     return new VideoDecoder({
       output: this.onFrame,
       error: (error) => {
+        this.errors++;
         this.state = "unconfigured";
         this.decoder = this.createDecoder();
         this.onError(error);
@@ -38,14 +41,25 @@ export class VideoReceiver {
     return this.decoder.decodeQueueSize;
   }
 
+  /** Frames thrown away and decoder errors since the last call; each skipped frame is video the pilot never saw. */
+  takeCounts(): { skippedFrames: number; decoderErrors: number } {
+    const counts = { skippedFrames: this.skipped, decoderErrors: this.errors };
+    this.skipped = this.errors = 0;
+    return counts;
+  }
+
   push(accessUnit: Uint8Array): void {
     const key = isKeyAccessUnit(accessUnit);
     switch (this.state) {
       case "configuring":
+        this.skipped++;
         return;
       case "unconfigured": {
         const codec = key ? codecFromAccessUnit(accessUnit) : null;
-        if (!codec) return;
+        if (!codec) {
+          this.skipped++;
+          return;
+        }
         this.state = "configuring";
         this.configure(codec, accessUnit).catch((error: Error) => {
           this.state = "unconfigured";
@@ -56,12 +70,16 @@ export class VideoReceiver {
       case "decoding":
         if (!key && this.decoder.decodeQueueSize > MAX_DECODE_QUEUE) {
           this.state = "waiting-key";
+          this.skipped++;
           return;
         }
         this.decode(accessUnit, key);
         return;
       case "waiting-key":
-        if (!key) return;
+        if (!key) {
+          this.skipped++;
+          return;
+        }
         this.state = "decoding";
         this.decode(accessUnit, key);
         return;
