@@ -1,6 +1,6 @@
 import type { DetectedMarker } from "./detector";
 import { targetBounds, type Box } from "./target-layer";
-import type { SortieState } from "./sortie";
+import { HITS_TO_SHOOT_DOWN, type SortieState } from "./sortie";
 
 export type Reticle = { x: number; y: number; radius: number };
 
@@ -8,6 +8,8 @@ export type HudInfo = {
   sortie: SortieState;
   markers: DetectedMarker[];
   reticle: Reticle;
+  /** Whether the reticle's centre is on a live target, i.e. a shot now would hit. */
+  aimed: boolean;
   battery: number | null;
   recording: boolean;
   linkUp: boolean;
@@ -21,17 +23,16 @@ export type HudInfo = {
 const GREEN = "#7dff9a";
 const AMBER = "#ffc857";
 const RED = "#ff5a5a";
+/** How long the muzzle flash and the hit marker stay on screen after a shot. */
+const SHOT_FX_MS = 120;
+const HIT_MARKER_MS = 250;
 
 function font(px: number, unit: number, weight = 600): string {
   return `${weight} ${px * unit}px ui-monospace, Menlo, "Hiragino Sans", monospace`;
 }
 
-export function isInReticle(point: { x: number; y: number }, reticle: Reticle): boolean {
-  return Math.hypot(point.x - reticle.x, point.y - reticle.y) <= reticle.radius;
-}
-
 /** Draws the instruments over the video already on the canvas. */
-export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
+export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo, now: number): void {
   const { width, height } = ctx.canvas;
   const { sortie, reticle } = hud;
   const unit = height / 720;
@@ -47,12 +48,14 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
     const box = targetBounds(marker);
     ctx.strokeStyle = ctx.fillStyle = down ? RED : AMBER;
     drawBrackets(ctx, box, 18 * unit);
-    text(ctx, down ? "DOWN" : `TGT ${marker.id}`, (box.left + box.right) / 2, box.top - 6 * unit);
+    const left = HITS_TO_SHOOT_DOWN - (sortie.hits[marker.id] ?? 0);
+    const label = down ? "DOWN" : `TGT ${marker.id} ${"■".repeat(left)}${"□".repeat(HITS_TO_SHOOT_DOWN - left)}`;
+    text(ctx, label, (box.left + box.right) / 2, box.top - 6 * unit);
   }
   ctx.textAlign = "left";
   ctx.textBaseline = "top";
 
-  ctx.strokeStyle = sortie.lock ? AMBER : GREEN;
+  ctx.strokeStyle = hud.aimed ? RED : GREEN;
   ctx.beginPath();
   ctx.arc(reticle.x, reticle.y, reticle.radius, 0, Math.PI * 2);
   ctx.moveTo(reticle.x - 12 * unit, reticle.y);
@@ -60,15 +63,7 @@ export function drawHud(ctx: CanvasRenderingContext2D, hud: HudInfo): void {
   ctx.moveTo(reticle.x, reticle.y - 12 * unit);
   ctx.lineTo(reticle.x, reticle.y + 12 * unit);
   ctx.stroke();
-  if (sortie.lock) {
-    ctx.lineWidth = 8 * unit;
-    ctx.strokeStyle = sortie.lock.progress >= 1 ? RED : AMBER;
-    ctx.beginPath();
-    const start = -Math.PI / 2;
-    ctx.arc(reticle.x, reticle.y, reticle.radius + 12 * unit, start, start + sortie.lock.progress * Math.PI * 2);
-    ctx.stroke();
-    ctx.lineWidth = 3 * unit;
-  }
+  drawShot(ctx, sortie.lastShot, reticle, unit, now);
 
   ctx.fillStyle = GREEN;
   const pad = 24 * unit;
@@ -146,14 +141,49 @@ function drawBrackets(
   ctx.stroke();
 }
 
+/** A muzzle flash from the bottom corners towards the reticle, and an X on the reticle when it hit. */
+function drawShot(ctx: CanvasRenderingContext2D, shot: SortieState["lastShot"], reticle: Reticle, unit: number, now: number): void {
+  if (!shot) return;
+  const age = now - shot.at;
+  const { width, height } = ctx.canvas;
+  if (age < SHOT_FX_MS) {
+    ctx.save();
+    ctx.strokeStyle = `rgba(255, 220, 140, ${1 - age / SHOT_FX_MS})`;
+    ctx.lineWidth = 4 * unit;
+    ctx.beginPath();
+    for (const fromX of [width * 0.3, width * 0.7]) {
+      ctx.moveTo(fromX, height);
+      ctx.lineTo(reticle.x + (fromX - reticle.x) * 0.15, reticle.y + (height - reticle.y) * 0.15);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+  if (shot.hit !== null && age < HIT_MARKER_MS) {
+    const inner = 10 * unit;
+    const outer = 26 * unit;
+    ctx.save();
+    ctx.strokeStyle = RED;
+    ctx.lineWidth = 4 * unit;
+    ctx.beginPath();
+    for (const [dx, dy] of [[1, 1], [1, -1], [-1, 1], [-1, -1]] as const) {
+      ctx.moveTo(reticle.x + dx * inner, reticle.y + dy * inner);
+      ctx.lineTo(reticle.x + dx * outer, reticle.y + dy * outer);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+}
+
 function bannerFor(sortie: SortieState): string | null {
   switch (sortie.phase) {
     case "ready":
       return "A ボタン / T キーで離陸";
     case "complete":
       return `全機撃墜  ${formatTime(sortie.elapsedMs)}`;
-    case "landed":
-      return `着陸  撃墜 ${sortie.shotDown.length}  ${formatTime(sortie.elapsedMs)}`;
+    case "landed": {
+      const rate = sortie.shots > 0 ? Math.round((sortie.shotsHit / sortie.shots) * 100) : 0;
+      return `着陸  撃墜 ${sortie.shotDown.length}  命中 ${rate}%  ${formatTime(sortie.elapsedMs)}`;
+    }
     case "flying":
       return null;
   }

@@ -41,7 +41,7 @@ real-flight/
 ├── src/
 │   ├── server/        Bun on the Mac: serves the cockpit, relays drone UDP ⇄ WebSocket
 │   │   └── drones/    one adapter per drone model (Tello first); the rest of the code is drone-agnostic
-│   ├── cockpit/       Quest 3 browser app: WebXR view, WebCodecs decode, HUD, lock-on, Touch controller input, recording
+│   ├── cockpit/       Quest 3 browser app: WebXR view, WebCodecs decode, HUD, shooting, Touch controller input, recording
 │   └── shared/        code both sides use: the WebSocket protocol, H.264 framing, target ids
 └── docs/
     ├── prd/           per-feature requirements and design (structure in prd/README.md)
@@ -70,7 +70,7 @@ The Quest 3 reaches the Mac over USB: `adb reverse tcp:<port> tcp:<port>`, then 
 
 ## Skills
 
-- Read `docs/adr/` before changing where decoding, lock-on or recording runs, or what the relay sends when cockpit input stops
+- Read `docs/adr/` before changing where decoding, hit judgement or recording runs, or what the relay sends when cockpit input stops
 - For Tello video latency and hardware observations, read [tello-video](.agents/skills/tello-video/SKILL.md); add Quest browser evidence there once measured.
 
 ## Review

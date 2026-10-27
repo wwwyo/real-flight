@@ -1,96 +1,88 @@
 import { describe, expect, test } from "bun:test";
-import { LOCK_GRACE_MS, Sortie } from "./sortie";
+import { FIRE_INTERVAL_MS, HITS_TO_SHOOT_DOWN, Sortie } from "./sortie";
 
-const LOCK_MS = 1000;
-const FRAME_MS = 33;
-
-/** Feeds frames from `from` to `to` with the given targets in the reticle; returns ids shot down. */
-function hold(sortie: Sortie, ids: number[], from: number, to: number): number[] {
-  const shot: number[] = [];
-  for (let t = from; t <= to; t += FRAME_MS) shot.push(...sortie.update(t, ids));
-  return shot;
+/** Fires `count` shots one interval apart at `aimedAt`, starting at `from`; returns ids shot down. */
+function burst(sortie: Sortie, aimedAt: number | null, from: number, count: number): number[] {
+  const down: number[] = [];
+  for (let i = 0; i < count; i++) {
+    const result = sortie.fire(from + i * FIRE_INTERVAL_MS, aimedAt);
+    if (result?.shotDown) down.push(result.hit!);
+  }
+  return down;
 }
 
 describe("Sortie", () => {
-  test("a target held in the reticle for the lock duration is shot down", () => {
-    const sortie = new Sortie([1, 2], LOCK_MS);
+  test("a target is shot down by its third hit", () => {
+    const sortie = new Sortie([1, 2]);
     sortie.takeoff(0);
 
-    expect(hold(sortie, [1], 0, 900)).toEqual([]);
-    expect(sortie.state.lock?.id).toBe(1);
-    expect(hold(sortie, [1], 933, 1100)).toEqual([1]);
+    expect(burst(sortie, 1, 0, HITS_TO_SHOOT_DOWN - 1)).toEqual([]);
+    expect(sortie.state.hits).toEqual({ 1: 2 });
+    expect(burst(sortie, 1, 1000, 1)).toEqual([1]);
     expect(sortie.state.remaining).toEqual([2]);
+    expect(sortie.state.hits).toEqual({});
   });
 
-  test("a target that leaves the reticle loses its lock", () => {
-    const sortie = new Sortie([1], LOCK_MS);
+  test("a held trigger fires once per interval", () => {
+    const sortie = new Sortie([1]);
     sortie.takeoff(0);
 
-    hold(sortie, [1], 0, 800);
-    hold(sortie, [], 833, 833 + LOCK_GRACE_MS + FRAME_MS);
-    expect(sortie.state.lock).toBeNull();
-    expect(hold(sortie, [1], 1200, 2100)).toEqual([]);
+    expect(sortie.fire(0, 1)).toEqual({ hit: 1, shotDown: false });
+    expect(sortie.fire(FIRE_INTERVAL_MS - 1, 1)).toBeNull();
+    expect(sortie.fire(FIRE_INTERVAL_MS, 1)).toEqual({ hit: 1, shotDown: false });
+    expect(sortie.state.shots).toBe(2);
   });
 
-  test("a detection dropout shorter than the grace keeps the lock", () => {
-    const sortie = new Sortie([1], LOCK_MS);
+  test("a miss counts as a shot but damages nothing", () => {
+    const sortie = new Sortie([1]);
     sortie.takeoff(0);
 
-    hold(sortie, [1], 0, 500);
-    sortie.update(500, [1]);
-    sortie.update(500 + LOCK_GRACE_MS - 50, []);
-    expect(hold(sortie, [1], 700, 1050)).toEqual([1]);
+    expect(sortie.fire(0, null)).toEqual({ hit: null, shotDown: false });
+    expect(sortie.state).toMatchObject({ shots: 1, shotsHit: 0, hits: {}, lastShot: { at: 0, hit: null } });
   });
 
   test("shooting down every target completes the sortie and stops the clock", () => {
-    const sortie = new Sortie([1], LOCK_MS);
+    const sortie = new Sortie([1]);
     sortie.takeoff(10_000);
 
-    hold(sortie, [1], 10_000, 11_100);
+    burst(sortie, 1, 10_000, HITS_TO_SHOOT_DOWN);
     const elapsed = sortie.state.elapsedMs;
-    sortie.update(20_000, []);
+    sortie.update(20_000);
     expect(sortie.state.phase).toBe("complete");
     expect(sortie.state.elapsedMs).toBe(elapsed);
+    expect(sortie.fire(20_000, null)).toBeNull();
   });
 
-  test("nothing is shot down before takeoff or after landing", () => {
-    const sortie = new Sortie([1], LOCK_MS);
-    expect(hold(sortie, [1], 0, 2000)).toEqual([]);
+  test("nothing is fired before takeoff or after landing", () => {
+    const sortie = new Sortie([1]);
+    expect(sortie.fire(0, 1)).toBeNull();
 
     sortie.takeoff(3000);
-    hold(sortie, [1], 3000, 3050);
     sortie.land(3100);
-    expect(sortie.state.lock).toBeNull();
-    expect(hold(sortie, [1], 3100, 5000)).toEqual([]);
-    expect(sortie.state.phase).toBe("landed");
+    expect(sortie.fire(3200, 1)).toBeNull();
+    expect(sortie.state).toMatchObject({ phase: "landed", shots: 0 });
   });
 
-  test("ids that are not targets are ignored", () => {
-    const sortie = new Sortie([1], LOCK_MS);
+  test("ids that are not live targets are misses", () => {
+    const sortie = new Sortie([1]);
     sortie.takeoff(0);
-    expect(hold(sortie, [42], 0, 2000)).toEqual([]);
-    expect(sortie.state.lock).toBeNull();
-  });
+    expect(sortie.fire(0, 42)).toEqual({ hit: null, shotDown: false });
 
-  test("a frame gap longer than the grace starts a new lock even if the target reappears", () => {
-    const sortie = new Sortie([1], LOCK_MS);
-    sortie.takeoff(0);
-    hold(sortie, [1], 0, 800);
-
-    expect(sortie.update(3000, [1])).toEqual([]);
-    expect(sortie.state.lock?.progress).toBe(0);
-    expect(hold(sortie, [1], 3033, 4100)).toEqual([1]);
+    const wrecked = new Sortie([1, 2]);
+    wrecked.takeoff(0);
+    burst(wrecked, 1, 0, HITS_TO_SHOOT_DOWN);
+    expect(wrecked.fire(5000, 1)).toEqual({ hit: null, shotDown: false });
   });
 
   test("takeoff while airborne preserves the sortie, including after all targets are shot down", () => {
-    const sortie = new Sortie([1, 2], LOCK_MS);
+    const sortie = new Sortie([1, 2]);
     sortie.takeoff(0);
-    hold(sortie, [1], 0, 1100);
+    burst(sortie, 1, 0, HITS_TO_SHOOT_DOWN);
     const flying = sortie.state;
     sortie.takeoff(1200);
     expect(sortie.state).toEqual(flying);
 
-    hold(sortie, [2], 1200, 2300);
+    burst(sortie, 2, 2000, HITS_TO_SHOOT_DOWN);
     const complete = sortie.state;
     sortie.takeoff(2500);
     expect(sortie.state).toEqual(complete);
@@ -100,8 +92,6 @@ describe("Sortie", () => {
     expect(sortie.airborne).toBe(false);
     expect(sortie.state.elapsedMs).toBe(complete.elapsedMs);
     sortie.takeoff(4000);
-    expect(sortie.state.remaining).toEqual([1, 2]);
-    expect(sortie.state.shotDown).toEqual([]);
-    expect(sortie.state.elapsedMs).toBe(0);
+    expect(sortie.state).toMatchObject({ remaining: [1, 2], shotDown: [], hits: {}, shots: 0, elapsedMs: 0 });
   });
 });
