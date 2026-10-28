@@ -130,7 +130,6 @@ export class XrCockpit {
 
   private showAsMeshes(): void {
     for (const screen of this.screens) {
-      screen.layer?.destroy();
       screen.layer = null;
       screen.mesh.visible = true;
     }
@@ -159,6 +158,8 @@ export class XrCockpit {
         state.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
         state.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
         gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, screen.canvas);
+        // The Layers spec requires the opaque texture to be unbound when the frame callback returns.
+        state.unbindTexture();
         screen.dirty = false;
       }
     } catch (error) {
