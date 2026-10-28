@@ -128,19 +128,6 @@ function keepKeysFromExtensions(): void {
 
 export const COMMAND_LABELS: Record<Command, string> = { takeoff: "離陸", land: "着陸", emergency: "緊急停止" };
 
-/** Stick input in the pilot's words, e.g. "右旋回 40% / 前進 60%"; values are percent of the drone's top speed. */
-export function describeRc({ leftRight, forwardBack, upDown, yaw }: RcInput): string {
-  const parts = [
-    [yaw, "右旋回", "左旋回"],
-    [forwardBack, "前進", "後退"],
-    [leftRight, "右移動", "左移動"],
-    [upDown, "上昇", "下降"],
-  ] as const;
-  const moving = parts.filter(([value]) => value !== 0);
-  if (moving.length === 0) return "ホバリング";
-  return moving.map(([value, plus, minus]) => `${value > 0 ? plus : minus} ${Math.abs(value)}%`).join(" / ");
-}
-
 function toRc(axis: number): number {
   const clamped = Math.max(-1, Math.min(1, axis));
   if (Math.abs(clamped) < DEADZONE) return 0;

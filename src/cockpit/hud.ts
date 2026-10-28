@@ -16,7 +16,7 @@ export type HudInfo = {
   /** Whether the relay hears the drone; the relay link alone does not mean the drone gets the input. */
   droneLinked: boolean;
   warning: string | null;
-  /** What the cockpit sent to the drone, bottom right, so the pilot can tell input from drone behavior. */
+  /** What became of the last button command, bottom right, e.g. why a takeoff was not sent. Stick input is not shown: the pilot has no time to read it. */
   sent: string[];
   /** Decode and detection numbers for tuning; null hides them. */
   stats: { fps: number; decodeQueue: number; detectMs: number } | null;
