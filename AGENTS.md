@@ -2,7 +2,7 @@
 
 ## Story
 
-A pilot flies a real machine into a fight in real air, and the people around watch it happen.
+A pilot flies a real machine into a fight in real air.
 
 Core actions:
 - Fly a sortie and shoot down a target — per play session
