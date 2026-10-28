@@ -24,6 +24,10 @@
         width: 150mm;
         height: 150mm;
       }
+      /* The 150 mm marker is sized for A4; a printer left on Letter crops or rescales it. */
+      @page {
+        size: A4;
+      }
       @media print {
         p {
           display: none;
