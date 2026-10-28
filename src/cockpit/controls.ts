@@ -5,10 +5,10 @@ export type ControlFrame = { rc: RcInput; commands: Command[]; fire: boolean };
 
 const DEADZONE = 0.12;
 /**
- * A key is all or nothing, and full yaw spins the whole view past the target before the delayed video
- * shows it; sticks keep their full range.
+ * Percent of the drone's top speed at full stick. Indoors and through delayed video, full speed carried
+ * the drone past where the pilot meant to stop; a key, being all or nothing, also gets only this much.
  */
-const KEY_YAW = 0.4;
+export const MAX_SPEED = 40;
 /** When several buttons are down, only the safest newly pressed command is sent. */
 const COMMAND_PRIORITY: readonly Command[] = ["emergency", "land", "takeoff"];
 // Touch controller (xr-standard mapping): buttons[0] is the index trigger, buttons[4] is A on the right
@@ -73,7 +73,7 @@ export class Controls {
     }
 
     const key = (code: string) => (this.keys.has(code) ? 1 : 0);
-    sticks.lx += (key("KeyD") - key("KeyA")) * KEY_YAW;
+    sticks.lx += key("KeyD") - key("KeyA");
     sticks.ly += key("KeyS") - key("KeyW");
     sticks.rx += key("ArrowRight") - key("ArrowLeft");
     sticks.ry += key("ArrowDown") - key("ArrowUp");
@@ -144,5 +144,5 @@ export function describeRc({ leftRight, forwardBack, upDown, yaw }: RcInput): st
 function toRc(axis: number): number {
   const clamped = Math.max(-1, Math.min(1, axis));
   if (Math.abs(clamped) < DEADZONE) return 0;
-  return Math.round(clamped * 100);
+  return Math.round(clamped * MAX_SPEED);
 }

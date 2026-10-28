@@ -13,12 +13,17 @@ export type HudInfo = {
   battery: number | null;
   recording: boolean;
   linkUp: boolean;
+  /** Whether the relay hears the drone; the relay link alone does not mean the drone gets the input. */
+  droneLinked: boolean;
   warning: string | null;
   /** What the cockpit sent to the drone, bottom right, so the pilot can tell input from drone behavior. */
   sent: string[];
   /** Decode and detection numbers for tuning; null hides them. */
   stats: { fps: number; decodeQueue: number; detectMs: number } | null;
 };
+
+/** The Touch controller layout, so a pilot new to the cockpit does not have to ask. */
+const CONTROLS_LEGEND = ["A 離陸  B 着陸  X 緊急停止", "トリガー 射撃", "左 上下・旋回", "右 前後・左右"];
 
 const GREEN = "#7dff9a";
 const AMBER = "#ffc857";
@@ -88,10 +93,18 @@ export function drawInstruments(ctx: CanvasRenderingContext2D, hud: HudInfo): vo
   text(ctx, `T+${formatTime(sortie.elapsedMs)}`, pad, pad + line);
   ctx.fillStyle = hud.battery !== null && hud.battery < 20 ? RED : GREEN;
   text(ctx, `BAT ${hud.battery ?? "--"}%`, pad, pad + line * 2);
+  ctx.fillStyle = GREEN;
+  ctx.globalAlpha = 0.7;
+  ctx.font = font(15, unit, 500);
+  CONTROLS_LEGEND.forEach((row, i) => text(ctx, row, pad, pad + line * 3.4 + i * 20 * unit));
+  ctx.globalAlpha = 1;
+  ctx.font = font(22, unit);
 
   ctx.textAlign = "right";
+  const link = !hud.linkUp ? "LINK LOST" : hud.droneLinked ? "LINK OK" : "DRONE LOST";
+  ctx.fillStyle = link === "LINK OK" ? GREEN : RED;
+  text(ctx, link, width - pad, pad);
   ctx.fillStyle = GREEN;
-  text(ctx, hud.linkUp ? "LINK OK" : "LINK LOST", width - pad, pad);
   if (hud.stats) {
     const { fps, decodeQueue, detectMs } = hud.stats;
     ctx.font = font(16, unit, 400);

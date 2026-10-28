@@ -49,6 +49,8 @@ document.body.append(xr.button());
 
 let battery: number | null = null;
 let linkUp = false;
+/** Assumed until the relay's first status, so a fresh page does not flash a lost drone. */
+let droneLinked = true;
 let role: ControlRole = "available";
 let lastFrameAt: number | null = null;
 /** When the view went stale, while it stays stale; logged once per stall. */
@@ -72,6 +74,7 @@ function videoFresh(now = performance.now()): boolean {
 
 function warningFor(now: number): string | null {
   if (!linkUp) return "接続が切れました — 操縦できません";
+  if (!droneLinked) return "機体と通信できません — 操縦は届いていません";
   if (!videoFresh(now)) {
     if (lastFrameAt === null) return "映像を待っています";
     // Flying on: the view may come back, and a drone that lands or freezes on its own surprises the pilot.
@@ -119,15 +122,19 @@ function render(shown = targets.track([], performance.now())): void {
     battery,
     recording: recorder.recording,
     linkUp,
+    droneLinked,
     warning: warningFor(now),
     sent: sentLines(now),
     stats: DEBUG ? { fps, decodeQueue: video.queueSize, detectMs: detector.lastMs } : null,
   };
+  // Before the first frame the raw view is transparent, and drawing over the last render smeared the HUD.
+  sightCtx.clearRect(0, 0, sightView.width, sightView.height);
   sightCtx.drawImage(rawView, 0, 0);
   targets.draw(sightCtx, shown, sortie.state, now);
   drawSight(sightCtx, hud, now);
   instrumentsCtx.clearRect(0, 0, instrumentsView.width, instrumentsView.height);
   drawInstruments(instrumentsCtx, hud);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.drawImage(sightView, 0, 0);
   ctx.drawImage(instrumentsView, 0, 0);
   xr.invalidate();
@@ -177,6 +184,8 @@ function connect(): void {
     switch (message.type) {
       case "status":
         battery = message.battery;
+        if (message.linked !== droneLinked) logEvent(message.linked ? "drone-linked" : "drone-lost");
+        droneLinked = message.linked;
         break;
       case "control":
         role = message.role;

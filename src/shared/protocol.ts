@@ -70,6 +70,8 @@ export type ServerMessage = {
   drone: string;
   /** Percent, or null until the drone reports it. */
   battery: number | null;
+  /** False while the drone does not answer: the relay is up, but nothing the pilot does reaches it. */
+  linked: boolean;
 } | { type: "control"; role: ControlRole }
   | { type: "command"; command: Command; accepted: boolean };
 
