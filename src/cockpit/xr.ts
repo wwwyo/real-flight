@@ -119,8 +119,7 @@ export class XrCockpit {
       // Later layers are composited on top: the video over the empty projection layer, the readouts over the video.
       session.updateRenderState({ layers: [projection, ...this.screens.map((screen) => screen.layer!)] });
     } catch (error) {
-      console.warn("quad layers unavailable, showing the screens as meshes", error);
-      this.showAsMeshes();
+      this.fallBackToMeshes(error);
       return;
     }
     for (const screen of this.screens) {
@@ -131,24 +130,39 @@ export class XrCockpit {
 
   private showAsMeshes(): void {
     for (const screen of this.screens) {
+      screen.layer?.destroy();
       screen.layer = null;
       screen.mesh.visible = true;
     }
+  }
+
+  /** Puts three's projection layer back on its own, so a layer failure mid-sortie leaves the old view, not a frozen one. */
+  private fallBackToMeshes(error: unknown): void {
+    console.warn("quad layers failed, showing the screens as meshes", error);
+    const projection = this.renderer.xr.getBaseLayer();
+    if (typeof XRProjectionLayer !== "undefined" && projection instanceof XRProjectionLayer) {
+      this.renderer.xr.getSession()?.updateRenderState({ layers: [projection] });
+    }
+    this.showAsMeshes();
   }
 
   /** Copies each changed canvas into its layer; needsRedraw means the compositor lost what it had. */
   private uploadLayers(frame: XRFrame): void {
     const gl = this.renderer.getContext();
     const state = this.renderer.state;
-    for (const screen of this.screens) {
-      if (!screen.layer || !(screen.dirty || screen.layer.needsRedraw)) continue;
-      const subImage = this.renderer.xr.getBinding().getSubImage(screen.layer, frame);
-      state.bindTexture(gl.TEXTURE_2D, subImage.colorTexture);
-      // Layer textures start at the bottom row, and the compositor blends them as premultiplied alpha.
-      state.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
-      state.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
-      gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, screen.canvas);
-      screen.dirty = false;
+    try {
+      for (const screen of this.screens) {
+        if (!screen.layer || !(screen.dirty || screen.layer.needsRedraw)) continue;
+        const subImage = this.renderer.xr.getBinding().getSubImage(screen.layer, frame);
+        state.bindTexture(gl.TEXTURE_2D, subImage.colorTexture);
+        // Layer textures start at the bottom row, and the compositor blends them as premultiplied alpha.
+        state.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
+        state.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, true);
+        gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, screen.canvas);
+        screen.dirty = false;
+      }
+    } catch (error) {
+      this.fallBackToMeshes(error);
     }
   }
 }
