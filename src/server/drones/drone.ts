@@ -15,4 +15,6 @@ export interface Drone {
   frames(): AsyncIterable<Uint8Array>;
   /** Battery in percent, or null until the drone reports it. */
   battery(): number | null;
+  /** Whether the drone is answering; false while it is off or out of the Mac's reach, when no input arrives. */
+  linked(): boolean;
 }

@@ -2,6 +2,11 @@ import { RECORDINGS_PATH } from "../shared/protocol";
 
 // H.264 first: browsers usually encode it in hardware, leaving the CPU to decode and lock-on.
 const MIME_TYPES = ["video/mp4;codecs=avc1", "video/webm;codecs=h264", "video/webm;codecs=vp8", "video/webm"];
+/**
+ * The Quest's default came out near 1.5 Mbps, re-encoding the Tello's already noisy picture into blocks.
+ * Ten minutes at this rate stays well under the relay's upload limit.
+ */
+const VIDEO_BITS_PER_SECOND = 6_000_000;
 
 /** Records the cockpit canvas (video + HUD) and uploads each recording to the Mac. */
 export class SortieRecorder {
@@ -21,7 +26,7 @@ export class SortieRecorder {
     if (this.recording) return;
     const mimeType = MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type));
     const stream = this.canvas.captureStream(30);
-    const recorder = new MediaRecorder(stream, { mimeType });
+    const recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: VIDEO_BITS_PER_SECOND });
     const chunks: Blob[] = [];
     recorder.ondataavailable = (event) => chunks.push(event.data);
     recorder.onerror = () => this.onError(new Error("録画が止まりました（MediaRecorder のエラー）"));

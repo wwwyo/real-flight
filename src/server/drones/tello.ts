@@ -20,7 +20,7 @@ export class Tello implements Drone {
   private replies: ((text: string) => void)[] = [];
   private batteryPercent: number | null = null;
   private lastStateAt: number | null = null;
-  private linked = false;
+  private isLinked = false;
   private video = new TransformStream<Uint8Array, Uint8Array>();
 
   constructor(private readonly log: (event: string, data?: LogData) => void = () => {}) {}
@@ -70,24 +70,28 @@ export class Tello implements Drone {
    */
   private async keepLinked(): Promise<void> {
     for (;;) {
-      if (!this.linked) {
+      if (!this.isLinked) {
         try {
           await this.request("command");
           await this.request("streamon");
-          this.linked = true;
+          this.isLinked = true;
           this.lastStateAt = performance.now();
           this.log("tello-linked");
         } catch {
           // Logged by request(); try again after a pause.
         }
       } else if (performance.now() - (this.lastStateAt ?? 0) > STATE_TIMEOUT_MS) {
-        this.linked = false;
+        this.isLinked = false;
         this.batteryPercent = null;
         this.log("tello-lost", { silentMs: STATE_TIMEOUT_MS });
         continue;
       }
-      await Bun.sleep(this.linked ? 500 : RETRY_MS);
+      await Bun.sleep(this.isLinked ? 500 : RETRY_MS);
     }
+  }
+
+  linked(): boolean {
+    return this.isLinked;
   }
 
   rc({ leftRight, forwardBack, upDown, yaw }: RcInput): void {

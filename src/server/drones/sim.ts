@@ -94,6 +94,10 @@ export class SimDrone implements Drone {
     return this.batteryPercent;
   }
 
+  linked(): boolean {
+    return true;
+  }
+
   private tick(): void {
     this.move();
     this.encoder?.stdin.write(this.renderView());

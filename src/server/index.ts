@@ -182,7 +182,7 @@ setInterval(() => {
 }, RC_WATCHDOG_MS);
 
 setInterval(() => {
-  const status: ServerMessage = { type: "status", drone: drone.name, battery: drone.battery() };
+  const status: ServerMessage = { type: "status", drone: drone.name, battery: drone.battery(), linked: drone.linked() };
   server.publish(Topic.Status, JSON.stringify(status));
 }, 1000);
 
