@@ -1,6 +1,6 @@
-import { HOVER, VIDEO_TIMEOUT_MS, WS_PATH, type CockpitMessage, type Command, type ControlRole, type LogData, type RcInput, type ServerMessage } from "../shared/protocol";
+import { HOVER, VIDEO_TIMEOUT_MS, WS_PATH, type CockpitMessage, type Command, type ControlRole, type LogData, type ServerMessage } from "../shared/protocol";
 import { TARGET_IDS } from "../shared/targets";
-import { COMMAND_LABELS, Controls, describeRc } from "./controls";
+import { COMMAND_LABELS, Controls } from "./controls";
 import { MarkerDetector, type DetectedMarker } from "./detector";
 import { onTorso, TargetLayer } from "./target-layer";
 import { drawInstruments, drawSight, type HudInfo } from "./hud";
@@ -57,9 +57,6 @@ let lastFrameAt: number | null = null;
 let stalledSince: number | null = null;
 let takeoffPending = false;
 let framesThisSecond = 0;
-/** The stick as read, and what was last sent to the drone (null while nothing is sent). */
-let stick: RcInput = HOVER;
-let sentRc: RcInput | null = null;
 let commandNote: { text: string; at: number } | null = null;
 /** The targets on screen, including ones just missed by detection: what the pilot can shoot at. */
 let shownMarkers: DetectedMarker[] = [];
@@ -90,11 +87,7 @@ function noteCommand(command: Command, outcome: string): void {
 }
 
 function sentLines(now: number): string[] {
-  const lines: string[] = [];
-  if (commandNote && now - commandNote.at <= COMMAND_NOTE_MS) lines.push(commandNote.text);
-  if (sentRc) lines.push(`送信: ${describeRc(sentRc)}`);
-  else if (describeRc(stick) !== describeRc(HOVER)) lines.push(`${describeRc(stick)}（地上のため未送信）`);
-  return lines;
+  return commandNote && now - commandNote.at <= COMMAND_NOTE_MS ? [commandNote.text] : [];
 }
 
 /** The live target under the reticle's centre, judged on the view the pilot sees. */
@@ -235,17 +228,11 @@ let stopRecordingTimer: ReturnType<typeof setTimeout> | undefined;
 
 function controlTick(xrSources?: XRInputSourceArray): void {
   const { rc, commands, fire } = controls.read(xrSources);
-  stick = rc;
   for (const command of commands) runCommand(command);
   const now = performance.now();
   if (fire && sortie.canFire(now)) shoot(now);
   if (now - lastRcAt >= RC_INTERVAL_MS) {
-    sentRc = null;
-    if (role === "pilot") {
-      const input = sortie.airborne ? rc : HOVER;
-      // The relay ignores stick input on the ground, so only airborne input counts as sent.
-      if (send({ type: "rc", ...input }) && sortie.airborne) sentRc = input;
-    }
+    if (role === "pilot") send({ type: "rc", ...(sortie.airborne ? rc : HOVER) });
     lastRcAt = now;
   }
 }
