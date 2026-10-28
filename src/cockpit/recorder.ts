@@ -3,7 +3,7 @@ import { RECORDINGS_PATH } from "../shared/protocol";
 // H.264 first: browsers usually encode it in hardware, leaving the CPU to decode and lock-on.
 const MIME_TYPES = ["video/mp4;codecs=avc1", "video/webm;codecs=h264", "video/webm;codecs=vp8", "video/webm"];
 /**
- * The Quest's default came out near 1.5 Mbps, re-encoding the Tello's already noisy picture into blocks.
+ * Requested encoder bitrate; measure the saved file before treating this as output quality.
  * Ten minutes at this rate stays well under the relay's upload limit.
  */
 const VIDEO_BITS_PER_SECOND = 6_000_000;
