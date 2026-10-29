@@ -11,7 +11,7 @@
       "devDependencies": {
         "@types/bun": "1.4.3",
         "@types/three": "0.186.0",
-        "e2e": "0.21.0",
+        "e2e": "0.21.2",
         "typescript": "7.0.2",
       },
     },
@@ -195,7 +195,7 @@
 
     "convert-source-map": ["convert-source-map@2.0.0", "", {}, "sha512-Kvp459HrV2FEJ1CAsi1Ku+MY3kasH19TFykTz2xWmMeq6bk2NU3XXvfJ+Q61m0xktWwt+1HSYf3JZsTms3aRJg=="],
 
-    "e2e": ["e2e@0.21.0", "", { "dependencies": { "@ai-sdk/provider": "4.0.26", "@clack/prompts": "1.8.1", "@jridgewell/remapping": "2.3.5", "@modelcontextprotocol/server": "2.3.1", "@oxc-project/runtime": "0.153.0", "@vitest/expect": "5.0.3", "commander": "15.0.0", "fast-png": "8.0.0", "get-tsconfig": "4.14.3", "oxc-parser": "0.153.0", "oxc-transform": "0.153.0", "picocolors": "1.1.1", "pixelmatch": "8.0.0", "zod": "4.6.1" }, "peerDependencies": { "@ai-sdk/anthropic": "^4.0.0", "@ai-sdk/google": "^4.0.0", "@ai-sdk/openai": "^4.0.0", "@ai-sdk/openai-compatible": "^3.0.0", "@ai-sdk/xai": "^5.0.0", "ai": "^7.0.0" }, "optionalPeers": ["@ai-sdk/anthropic", "@ai-sdk/google", "@ai-sdk/openai", "@ai-sdk/openai-compatible", "@ai-sdk/xai", "ai"], "bin": { "e2e": "./dist/cli/bin.js" } }, "sha512-QucUfPD2VrFtgpazPJkYXs/rbwffQb2m3CyUUN/WdqFSyZtIR2pTFb1lYClk0TOhWbUcSEdUAsItdViCfrzZXw=="],
+    "e2e": ["e2e@0.21.2", "", { "dependencies": { "@ai-sdk/provider": "4.0.26", "@clack/prompts": "1.8.1", "@jridgewell/remapping": "2.3.5", "@modelcontextprotocol/server": "2.3.1", "@oxc-project/runtime": "0.153.0", "@vitest/expect": "5.0.3", "commander": "15.0.0", "fast-png": "8.0.0", "get-tsconfig": "4.14.3", "oxc-parser": "0.153.0", "oxc-transform": "0.153.0", "picocolors": "1.1.1", "pixelmatch": "8.0.0", "zod": "4.6.1" }, "peerDependencies": { "@ai-sdk/anthropic": "^4.0.0", "@ai-sdk/google": "^4.0.0", "@ai-sdk/openai": "^4.0.0", "@ai-sdk/openai-compatible": "^3.0.0", "@ai-sdk/xai": "^5.0.0", "ai": "^7.0.0" }, "optionalPeers": ["@ai-sdk/anthropic", "@ai-sdk/google", "@ai-sdk/openai", "@ai-sdk/openai-compatible", "@ai-sdk/xai", "ai"], "bin": { "e2e": "./dist/cli/bin.js" } }, "sha512-w3NNJLbu0wkUhGy44O3elTXhDNdwetrvEhVvqA2ZjUx+l+ccchIVADodrOXaP2FaB15Y/lnZMbQrOdfVOheJIA=="],
 
     "fast-png": ["fast-png@8.0.0", "", { "dependencies": { "fflate": "^0.8.2", "iobuffer": "^6.0.1" } }, "sha512-gCysNasJ8KEMgfdYIKd/wTDo6ENK1PWT0RJO7O+0pgmuHPw2O6tA1WvdxFRJoLf9V8yFYpG0FA1YgI8X97OhJA=="],
 
