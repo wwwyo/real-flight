@@ -24,7 +24,7 @@ The pilot takes off and hovers in the room. Waves of virtual enemy aircraft fly 
 
 - Find out whether enemies that attack make a sortie feel like a fight, compared with the MVP.
 - Find out whether aiming and dodging by flying the real drone is the fun part, i.e. whether the real machine matters to the game.
-- Get a sortie video that shows a fight, not target practice, for the TCIC application (deadline extended to 11/4).
+- Get a sortie video that shows a fight, not target practice, for the TCIC IP INNOVATION AWARDS 2026 application (deadline extended to 2026-11-04).
 
 ### Non-Goals
 
@@ -59,7 +59,7 @@ Wave and enemy aircraft move to the [AGENTS.md Glossary](../../../AGENTS.md#glos
 4. The pilot can call an evasive flip with one button. The drone does a real flip, enemy fire does not hit it during the flip, and the cockpit refuses the flip when the drone cannot do it safely.
 5. After the waves, the printed target appears as the last enemy. Shooting it down wins the sortie; running out of armor loses it. In both cases the pilot sees the result and score, and the drone keeps flying until the pilot lands it.
 6. The pilot hears the fight in the cockpit (firing, hits, shoot-downs, warnings), and the sortie recording includes that sound.
-7. The developer can play a whole sortie with the simulated drone on a PC, without the Tello.
+7. The developer can play a whole sortie with the simulated drone on the Mac, without the Tello.
 
 ## Non-Functional Requirements
 
