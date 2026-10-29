@@ -11,3 +11,4 @@ prd/
 ```
 
 - [sortie-mvp](sortie-mvp/prd.md) — one pilot, one Tello: fly a sortie, shoot down targets, record the sortie video
+- [enemy-waves](enemy-waves/prd.md) — waves of virtual enemy aircraft that attack the drone and are dodged by flying it, ending with the printed target
