@@ -4,6 +4,7 @@ import { MAX_LOG_TEXT, parseCockpitMessage } from "./protocol";
 describe("parseCockpitMessage", () => {
   test("accepts commands and stick input", () => {
     expect(parseCockpitMessage('{"type":"emergency"}')).toEqual({ type: "emergency" });
+    expect(parseCockpitMessage('{"type":"flip","direction":"b"}')).toEqual({ type: "flip", direction: "b" });
     expect(parseCockpitMessage('{"type":"rc","leftRight":10,"forwardBack":-20,"upDown":0,"yaw":5}')).toEqual({
       type: "rc",
       leftRight: 10,
@@ -11,6 +12,12 @@ describe("parseCockpitMessage", () => {
       upDown: 0,
       yaw: 5,
     });
+  });
+
+  test("rejects a flip without a direction the drone knows", () => {
+    for (const text of ['{"type":"flip"}', '{"type":"flip","direction":"up"}', '{"type":"flip","direction":"b; land"}']) {
+      expect(parseCockpitMessage(text)).toBeNull();
+    }
   });
 
   test("clamps stick input to whole numbers within the drone's range", () => {

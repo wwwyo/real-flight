@@ -13,6 +13,10 @@ export type RcInput = {
 
 export const HOVER: RcInput = { leftRight: 0, forwardBack: 0, upDown: 0, yaw: 0 };
 
+/** Tello SDK flip directions: left, right, forward, back. */
+export const FLIP_DIRECTIONS = ["l", "r", "f", "b"] as const;
+export type FlipDirection = (typeof FLIP_DIRECTIONS)[number];
+
 /** Flat values a cockpit log entry may carry. */
 export type LogData = Record<string, string | number | boolean | null>;
 
@@ -21,10 +25,11 @@ export type CockpitMessage =
   | { type: "takeoff" }
   | { type: "land" }
   | { type: "emergency" }
+  | { type: "flip"; direction: FlipDirection }
   /** What the cockpit saw, written to the Mac's link log so a session can be read back afterwards. */
   | { type: "log"; event: string; data: LogData };
 
-/** One-shot drone commands: every cockpit message except stick input and logs. */
+/** One-shot drone commands: every cockpit message except stick input and logs. A flip also carries its direction. */
 export type Command = Exclude<CockpitMessage["type"], "rc" | "log">;
 
 const COMMANDS: readonly string[] = ["takeoff", "land", "emergency"] satisfies Command[];
@@ -46,7 +51,11 @@ export function parseCockpitMessage(text: string): CockpitMessage | null {
   }
   if (typeof value !== "object" || value === null || !("type" in value)) return null;
   const { type } = value;
-  if (typeof type === "string" && COMMANDS.includes(type)) return { type: type as Command };
+  if (typeof type === "string" && COMMANDS.includes(type)) return { type: type as Exclude<Command, "flip"> };
+  if (type === "flip") {
+    const { direction } = value as Record<string, unknown>;
+    return FLIP_DIRECTIONS.includes(direction as FlipDirection) ? { type, direction: direction as FlipDirection } : null;
+  }
   if (type === "log") return text.length <= MAX_LOG_TEXT ? parseLog(value) : null;
   if (type !== "rc") return null;
   const rc = value as Record<string, unknown>;

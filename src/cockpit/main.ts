@@ -1,6 +1,6 @@
-import { HOVER, VIDEO_TIMEOUT_MS, WS_PATH, type CockpitMessage, type Command, type ControlRole, type LogData, type ServerMessage } from "../shared/protocol";
+import { HOVER, VIDEO_TIMEOUT_MS, WS_PATH, type CockpitMessage, type Command, type ControlRole, type LogData, type RcInput, type ServerMessage } from "../shared/protocol";
 import { TARGET_IDS } from "../shared/targets";
-import { COMMAND_LABELS, Controls } from "./controls";
+import { COMMAND_LABELS, Controls, flipDirection } from "./controls";
 import { MarkerDetector, type DetectedMarker } from "./detector";
 import { onTorso, TargetLayer } from "./target-layer";
 import { drawInstruments, drawSight, type HudInfo } from "./hud";
@@ -17,6 +17,11 @@ const DEBUG = new URLSearchParams(location.search).has("debug");
 /** Keeps recording after landing so the sortie video shows the touchdown; a Tello takes a few seconds to come down. */
 const RECORD_AFTER_LANDING_MS = 5000;
 const LOG_STATS_INTERVAL_MS = 1000;
+/**
+ * Tello is reported to refuse flips below about this battery; the cockpit says why instead of sending a
+ * flip the drone only answers with "error". Unconfirmed on this drone.
+ */
+const FLIP_MIN_BATTERY = 50;
 /** How long the last button press and its answer stay on the HUD. */
 const COMMAND_NOTE_MS = 3000;
 
@@ -198,7 +203,7 @@ function connect(): void {
           } else {
             showError(new Error("離陸できません。別のタブが操縦中か、すでに離陸しています。"));
           }
-        } else if (message.accepted) {
+        } else if (message.accepted && message.command !== "flip") {
           endSortie();
         }
         break;
@@ -228,7 +233,7 @@ let stopRecordingTimer: ReturnType<typeof setTimeout> | undefined;
 
 function controlTick(xrSources?: XRInputSourceArray): void {
   const { rc, commands, fire } = controls.read(xrSources);
-  for (const command of commands) runCommand(command);
+  for (const command of commands) runCommand(command, rc);
   const now = performance.now();
   if (fire && sortie.canFire(now)) shoot(now);
   if (now - lastRcAt >= RC_INTERVAL_MS) {
@@ -241,7 +246,7 @@ function logEvent(event: string, data: LogData = {}): void {
   send({ type: "log", event, data });
 }
 
-function runCommand(command: Command): void {
+function runCommand(command: Command, rc: RcInput = HOVER): void {
   if (role === "observer") {
     logEvent("command-blocked", { command, reason: "observer" });
     noteCommand(command, "✗ 未送信（別のタブが操縦中）");
@@ -265,6 +270,14 @@ function runCommand(command: Command): void {
     }
     takeoffPending = send({ type: command });
     noteCommand(command, takeoffPending ? "→ 送信" : "✗ 未送信（接続なし）");
+  } else if (command === "flip") {
+    if (!sortie.airborne) {
+      noteCommand(command, "✗ 未送信（地上）");
+    } else if (battery !== null && battery < FLIP_MIN_BATTERY) {
+      noteCommand(command, `✗ 未送信（電池 ${FLIP_MIN_BATTERY}% 未満）`);
+    } else {
+      noteCommand(command, send({ type: command, direction: flipDirection(rc) }) ? "→ 送信" : "✗ 未送信（接続なし）");
+    }
   } else if (send({ type: command })) {
     noteCommand(command, "→ 送信");
   } else {

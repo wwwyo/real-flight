@@ -1,6 +1,6 @@
 import { AR } from "js-aruco2";
 import { AccessUnitSplitter } from "../../shared/h264";
-import { HOVER, type RcInput } from "../../shared/protocol";
+import { HOVER, type FlipDirection, type RcInput } from "../../shared/protocol";
 import { MARKER_DICTIONARY, TARGET_IDS } from "../../shared/targets";
 import type { Drone } from "./drone";
 
@@ -20,6 +20,14 @@ const MAX_ZOOM = 2.5;
 const MAX_SPEED = 24;
 /** World pixels per frame for the automatic climb after take-off and the descent when landing. */
 const CLIMB_SPEED = 8;
+/** A flip takes about a second, pushes the drone a little the way it turns, and costs some height. */
+const FLIP_FRAMES = FPS;
+const FLIP_PUSH: Record<FlipDirection, Partial<RcInput>> = {
+  l: { leftRight: -100 },
+  r: { leftRight: 100 },
+  f: { forwardBack: 100 },
+  b: { forwardBack: -100 },
+};
 const HORIZON = 1300;
 /** Hover altitude after take-off; low enough that no target starts inside the reticle. */
 const TAKEOFF_ALTITUDE_Y = 1130;
@@ -48,6 +56,8 @@ export class SimDrone implements Drone {
   private input: RcInput = { ...HOVER };
   private batteryPercent = 100;
   private flownFrames = 0;
+  /** Frames left in a flip, and its push; the sticks do nothing meanwhile, as on a Tello. */
+  private flipping = { frames: 0, push: HOVER };
   private encoder?: Bun.Subprocess<"pipe", "pipe", "inherit">;
 
   async connect(): Promise<void> {
@@ -84,6 +94,10 @@ export class SimDrone implements Drone {
     this.pose.y = groundY(this.pose.zoom);
   }
 
+  flip(direction: FlipDirection): void {
+    if (this.phase === "flying") this.flipping = { frames: FLIP_FRAMES, push: { ...HOVER, ...FLIP_PUSH[direction], upDown: -40 } };
+  }
+
   async *frames(): AsyncIterable<Uint8Array> {
     if (!this.encoder) throw new Error("connect() first");
     const splitter = new AccessUnitSplitter();
@@ -108,7 +122,9 @@ export class SimDrone implements Drone {
     if (this.phase === "landed") return;
     if (++this.flownFrames % (FPS * 20) === 0) this.batteryPercent = Math.max(0, this.batteryPercent - 1);
     // Like a Tello, the drone ignores the sticks while it takes off or lands.
-    const target = this.phase === "flying" ? this.input : HOVER;
+    const flipping = this.flipping.frames > 0;
+    if (flipping) this.flipping.frames--;
+    const target = this.phase !== "flying" ? HOVER : flipping ? this.flipping.push : this.input;
     // First-order lag so the view drifts like an airframe instead of snapping to the sticks.
     for (const axis of ["leftRight", "forwardBack", "upDown", "yaw"] as const) {
       this.velocity[axis] += (target[axis] - this.velocity[axis]) * 0.12;

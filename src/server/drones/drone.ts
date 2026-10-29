@@ -1,4 +1,4 @@
-import type { RcInput } from "../../shared/protocol";
+import type { FlipDirection, RcInput } from "../../shared/protocol";
 
 /**
  * The boundary that hides one drone model. The relay and the cockpit only talk to this,
@@ -11,6 +11,8 @@ export interface Drone {
   takeoff(): void;
   land(): void;
   emergency(): void;
+  /** A full flip in place; the drone itself refuses it when it cannot, e.g. on a low battery. */
+  flip(direction: FlipDirection): void;
   /** The camera as H.264 access units (Annex B), one per frame. */
   frames(): AsyncIterable<Uint8Array>;
   /** Battery in percent, or null until the drone reports it. */
