@@ -137,7 +137,9 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
   }
   // Take-off while airborne without a pilot is a cockpit taking the drone back, not a second take-off.
   const reclaim = message.type === "takeoff" && airborne && !pilot;
-  const accepted = (!pilot || ws === pilot) && (message.type !== "takeoff" || !airborne || reclaim);
+  // A flip only makes sense in the air, and only from the cockpit flying the drone.
+  const accepted =
+    (!pilot || ws === pilot) && (message.type !== "takeoff" || !airborne || reclaim) && (message.type !== "flip" || (ws === pilot && airborne));
   log.event("relay", "command", { command: message.type, accepted, otherPilot: pilot !== null && ws !== pilot, airborne });
   if (!accepted) {
     ws.send(JSON.stringify({ type: "command", command: message.type, accepted } satisfies ServerMessage));
@@ -165,6 +167,10 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
       airborne = false;
       drone.emergency();
       hover.reset();
+      break;
+    case "flip":
+      hover.noteInput(Date.now());
+      drone.flip(message.direction);
       break;
   }
   ws.send(JSON.stringify({ type: "command", command: message.type, accepted } satisfies ServerMessage));

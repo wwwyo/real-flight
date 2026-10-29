@@ -1,5 +1,5 @@
 import { AccessUnitSplitter } from "../../shared/h264";
-import type { LogData, RcInput } from "../../shared/protocol";
+import type { FlipDirection, LogData, RcInput } from "../../shared/protocol";
 import type { Drone } from "./drone";
 
 const TELLO_IP = "192.168.10.1";
@@ -115,6 +115,10 @@ export class Tello implements Drone {
 
   emergency(): void {
     this.command("emergency");
+  }
+
+  flip(direction: FlipDirection): void {
+    this.command(`flip ${direction}`);
   }
 
   frames(): AsyncIterable<Uint8Array> {

@@ -23,7 +23,7 @@ export type HudInfo = {
 };
 
 /** The Touch controller layout, so a pilot new to the cockpit does not have to ask. */
-const CONTROLS_LEGEND = ["A 離陸  B 着陸  X 緊急停止", "トリガー 射撃", "左 上下・旋回", "右 前後・左右"];
+const CONTROLS_LEGEND = ["A 離陸  B 着陸  X 緊急停止  Y 宙返り", "トリガー 射撃", "左 上下・旋回", "右 前後・左右"];
 
 const GREEN = "#7dff9a";
 const AMBER = "#ffc857";

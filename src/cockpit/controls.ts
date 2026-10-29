@@ -1,4 +1,4 @@
-import type { Command, RcInput } from "../shared/protocol";
+import type { Command, FlipDirection, RcInput } from "../shared/protocol";
 
 /** `fire` is true while the trigger is held; the sortie limits how often that shoots. */
 export type ControlFrame = { rc: RcInput; commands: Command[]; fire: boolean };
@@ -10,7 +10,7 @@ const DEADZONE = 0.12;
  */
 export const MAX_SPEED = 40;
 /** When several buttons are down, only the safest newly pressed command is sent. */
-const COMMAND_PRIORITY: readonly Command[] = ["emergency", "land", "takeoff"];
+const COMMAND_PRIORITY: readonly Command[] = ["emergency", "land", "takeoff", "flip"];
 // Touch controller (xr-standard mapping): buttons[0] is the index trigger, buttons[4] is A on the right
 // hand and X on the left, buttons[5] is B / Y.
 const TOUCH_TRIGGER = 0;
@@ -20,6 +20,7 @@ const TOUCH_B_Y = 5;
 const PAD_A = 0;
 const PAD_B = 1;
 const PAD_X = 2;
+const PAD_Y = 3;
 const PAD_RT = 7;
 
 /**
@@ -54,6 +55,7 @@ export class Controls {
         if (source.handedness === "left") {
           [sticks.lx, sticks.ly] = [x, y];
           if (pad.buttons[TOUCH_A_X]?.pressed) buttons.add("emergency");
+          if (pad.buttons[TOUCH_B_Y]?.pressed) buttons.add("flip");
         } else if (source.handedness === "right") {
           [sticks.rx, sticks.ry] = [x, y];
           if (pad.buttons[TOUCH_TRIGGER]?.pressed) fire = true;
@@ -68,6 +70,7 @@ export class Controls {
         if (pad.buttons[PAD_A]?.pressed) buttons.add("takeoff");
         if (pad.buttons[PAD_B]?.pressed) buttons.add("land");
         if (pad.buttons[PAD_X]?.pressed) buttons.add("emergency");
+        if (pad.buttons[PAD_Y]?.pressed) buttons.add("flip");
         if (pad.buttons[PAD_RT]?.pressed) fire = true;
       }
     }
@@ -80,11 +83,12 @@ export class Controls {
     if (this.keys.has("KeyT")) buttons.add("takeoff");
     if (this.keys.has("KeyL")) buttons.add("land");
     if (this.keys.has("Space")) buttons.add("emergency");
+    if (this.keys.has("KeyQ")) buttons.add("flip");
     if (this.keys.has("KeyF")) fire = true;
 
     const fresh = COMMAND_PRIORITY.find((command) => buttons.has(command) && !this.pressed.has(command));
-    // Holding emergency or land must never be undone by a take-off pressed at the same time.
-    const blocked = fresh === "takeoff" && (buttons.has("emergency") || buttons.has("land"));
+    // Holding emergency or land must never be undone by a take-off or flip pressed at the same time.
+    const blocked = (fresh === "takeoff" || fresh === "flip") && (buttons.has("emergency") || buttons.has("land"));
     const commands = fresh && !blocked ? [fresh] : [];
     this.pressed = buttons;
 
@@ -126,7 +130,14 @@ function keepKeysFromExtensions(): void {
   sink.focus({ preventScroll: true });
 }
 
-export const COMMAND_LABELS: Record<Command, string> = { takeoff: "離陸", land: "着陸", emergency: "緊急停止" };
+export const COMMAND_LABELS: Record<Command, string> = { takeoff: "離陸", land: "着陸", emergency: "緊急停止", flip: "宙返り" };
+
+/** A flip goes the way the right stick is pushed; with it centred, backward, away from what the pilot faces. */
+export function flipDirection({ leftRight, forwardBack }: RcInput): FlipDirection {
+  if (leftRight === 0 && forwardBack === 0) return "b";
+  if (Math.abs(forwardBack) >= Math.abs(leftRight)) return forwardBack > 0 ? "f" : "b";
+  return leftRight > 0 ? "r" : "l";
+}
 
 function toRc(axis: number): number {
   const clamped = Math.max(-1, Math.min(1, axis));
