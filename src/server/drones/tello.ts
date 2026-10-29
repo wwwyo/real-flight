@@ -4,6 +4,12 @@ import type { Drone } from "./drone";
 
 const TELLO_IP = "192.168.10.1";
 const COMMAND_PORT = 8889;
+/**
+ * The Tello keeps answering the port that first sent it `command` until it is switched off. A random
+ * port per relay start left a restarted relay without replies, showing DRONE LOST while the drone
+ * still obeyed; a fixed port lets every restart pick up the replies.
+ */
+const REPLY_PORT = 8889;
 const STATE_PORT = 8890;
 const VIDEO_PORT = 11111;
 // Tello splits each frame into 1460-byte packets; a shorter one ends the frame.
@@ -27,6 +33,7 @@ export class Tello implements Drone {
 
   async connect(): Promise<void> {
     this.commandSocket = await Bun.udpSocket({
+      port: REPLY_PORT,
       socket: {
         data: (_socket, buf) => {
           const reply = buf.toString().trim();
