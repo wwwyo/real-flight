@@ -84,11 +84,13 @@ export class SimDrone implements Drone {
   }
 
   land(): void {
+    this.flipping = { frames: 0, push: HOVER };
     if (this.phase !== "landed") this.phase = "descending";
   }
 
   /** The motors stop, so the drone drops straight to the ground. */
   emergency(): void {
+    this.flipping = { frames: 0, push: HOVER };
     this.phase = "landed";
     this.velocity = { ...HOVER };
     this.pose.y = groundY(this.pose.zoom);

@@ -19,7 +19,8 @@ const RECORD_AFTER_LANDING_MS = 5000;
 const LOG_STATS_INTERVAL_MS = 1000;
 /**
  * Tello is reported to refuse flips below about this battery; the cockpit says why instead of sending a
- * flip the drone only answers with "error". Unconfirmed on this drone.
+ * flip the drone only answers with "error". Unconfirmed on this drone; while the battery is unknown the
+ * flip is sent and the drone decides.
  */
 const FLIP_MIN_BATTERY = 50;
 /** How long the last button press and its answer stay on the HUD. */
@@ -271,7 +272,9 @@ function runCommand(command: Command, rc: RcInput = HOVER): void {
     takeoffPending = send({ type: command });
     noteCommand(command, takeoffPending ? "→ 送信" : "✗ 未送信（接続なし）");
   } else if (command === "flip") {
-    if (!sortie.airborne) {
+    if (role !== "pilot") {
+      noteCommand(command, "✗ 未送信（操縦していません）");
+    } else if (!sortie.airborne) {
       noteCommand(command, "✗ 未送信（地上）");
     } else if (battery !== null && battery < FLIP_MIN_BATTERY) {
       noteCommand(command, `✗ 未送信（電池 ${FLIP_MIN_BATTERY}% 未満）`);

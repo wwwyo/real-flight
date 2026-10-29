@@ -169,6 +169,7 @@ function handle(ws: Bun.ServerWebSocket<unknown>, message: CockpitMessage): void
       hover.reset();
       break;
     case "flip":
+      hover.noteInput(Date.now());
       drone.flip(message.direction);
       break;
   }
