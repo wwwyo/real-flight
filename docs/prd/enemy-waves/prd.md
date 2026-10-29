@@ -1,5 +1,5 @@
 ---
-status: draft
+status: ready
 ---
 
 # Enemy waves
@@ -18,13 +18,13 @@ The Story is a pilot flying a real machine into a fight in real air. The MVP sho
 
 ## Overview
 
-The pilot takes off and hovers in the room. Waves of virtual enemy aircraft fly in around the drone in formation and fire at it. The enemies keep their place in the air when the drone turns or climbs, so the pilot aims by flying the real drone and dodges by moving it out of the line of fire. In a tight spot the pilot makes the drone do a real flip, which no shot can hit. The sortie ends with the printed target as the last enemy; shooting it down wins, and losing all armor first ends the sortie. Sound in the cockpit and in the recording carries the fight.
+The pilot takes off and hovers in the room. Waves of virtual enemy aircraft fly in around the drone in formation and fire at it. The enemies keep their place in the air when the drone turns or climbs, so the pilot aims by flying the real drone and dodges by moving it out of the line of fire. In a tight spot the pilot makes the drone do a real flip, which no shot can hit. The sortie ends with the printed target as the last enemy; shooting it down wins, and losing all armor first loses. The cockpit shows the result; the drone stays in the pilot's hands until they land it. Sound in the cockpit and in the recording carries the fight.
 
 ### Goals
 
 - Find out whether enemies that attack make a sortie feel like a fight, compared with the MVP.
 - Find out whether aiming and dodging by flying the real drone is the fun part, i.e. whether the real machine matters to the game.
-- Get a sortie video that shows a fight, not target practice.
+- Get a sortie video that shows a fight, not target practice, for the TCIC application (deadline extended to 11/4).
 
 ### Non-Goals
 
@@ -45,7 +45,7 @@ Wave and enemy aircraft move to the [AGENTS.md Glossary](../../../AGENTS.md#glos
 
 ## Domain Model
 
-- A sortie is a sequence of waves followed by the targets placed in the room. It is won when the last target is shot down, and lost when armor runs out. Either way the drone lands.
+- A sortie is a sequence of waves followed by the targets placed in the room. It is won when the last target is shot down, and lost when armor runs out. Either way the cockpit shows the result, and the pilot keeps flying until they land.
 - Enemy aircraft and targets are both shot by the same trigger and reticle. Enemy aircraft fly and fire; targets stand still and do not fire.
 - Enemy fire is aimed at where the drone is when it is fired. It hits when it reaches the drone and the drone has not moved out of its way.
 - Shooting down a whole wave earns a power-up that makes the drone's fire stronger for a while.
@@ -57,19 +57,14 @@ Wave and enemy aircraft move to the [AGENTS.md Glossary](../../../AGENTS.md#glos
 2. The pilot shoots down enemy aircraft by flying the drone to put the reticle on them and firing.
 3. Enemy aircraft fire at the drone. The pilot sees fire coming, can avoid it by moving the drone, and sees when the drone is hit and how much armor is left.
 4. The pilot can call an evasive flip with one button. The drone does a real flip, enemy fire does not hit it during the flip, and the cockpit refuses the flip when the drone cannot do it safely.
-5. After the waves, the printed target appears as the last enemy. Shooting it down wins the sortie; running out of armor loses it. In both cases the drone lands and the pilot sees the result and score.
+5. After the waves, the printed target appears as the last enemy. Shooting it down wins the sortie; running out of armor loses it. In both cases the pilot sees the result and score, and the drone keeps flying until the pilot lands it.
 6. The pilot hears the fight in the cockpit (firing, hits, shoot-downs, warnings), and the sortie recording includes that sound.
 7. The developer can play a whole sortie with the simulated drone on a PC, without the Tello.
 
 ## Non-Functional Requirements
 
-- Safety: everything in the [Sortie MVP](../sortie-mvp/prd.md#non-functional-requirements) still holds. The game never moves the drone on its own except to land at the end of a sortie and the flip the pilot asks for.
+- Safety: everything in the [Sortie MVP](../sortie-mvp/prd.md#non-functional-requirements) still holds. The game never moves the drone on its own, not even when a sortie is lost; the only game move sent to the drone is the flip the pilot asks for.
 - The MVP's target-only sortie stays available until this is proven on the drone, so a sortie video can still be shot with it.
-
-## Open Questions
-
-- The new deadline for the TCIC application, which sets how much of this goes into the sortie video.
-- Whether losing a sortie should land the drone, or let the pilot keep flying for the video.
 
 ## Success Metrics
 
