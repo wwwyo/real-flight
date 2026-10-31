@@ -186,8 +186,9 @@ export class Tello implements Drone {
 export function parseState(text: string): Record<string, number> {
   const state: Record<string, number> = {};
   for (const pair of text.trim().split(";")) {
-    const [key, value] = pair.split(":");
-    if (key && value !== undefined && Number.isFinite(Number(value))) state[key] = Number(value);
+    // `Number("")` is 0, so an empty value would read as a flat battery; only a whole number pair counts.
+    const match = /^(\w+):(-?\d+(?:\.\d+)?)$/.exec(pair.trim());
+    if (match) state[match[1]!] = Number(match[2]);
   }
   return state;
 }

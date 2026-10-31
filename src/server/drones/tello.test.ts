@@ -11,4 +11,5 @@ test("parseState reads every field of a state packet as a number", () => {
 
 test("parseState skips fields that are not numbers", () => {
   expect(parseState("mid:-1;x:abc;bat:50;")).toEqual({ mid: -1, bat: 50 });
+  expect(parseState("bat:;h: ;tof:84:9;yaw:3;")).toEqual({ yaw: 3 });
 });
