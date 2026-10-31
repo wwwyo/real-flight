@@ -8,7 +8,14 @@ import { HoverWatchdog, RC_WATCHDOG_MS } from "./hover-watchdog";
 import { LinkLog, VideoStats } from "./link-log";
 
 const PORT = Number(process.env.PORT ?? 8080);
-const DRONES: Record<string, () => Drone> = { sim: () => new SimDrone(), tello: () => new Tello((event, data) => log.event("drone", event, data)) };
+const DRONES: Record<string, () => Drone> = {
+  sim: () => new SimDrone(),
+  tello: () =>
+    new Tello(
+      (event, data) => log.event("drone", event, data),
+      (event, data) => log.stats("drone", event, data),
+    ),
+};
 const RECORDINGS_DIR = "recordings";
 const STATS_WINDOW_MS = 1000;
 /**
