@@ -29,7 +29,11 @@ export class Tello implements Drone {
   private isLinked = false;
   private video = new TransformStream<Uint8Array, Uint8Array>();
 
-  constructor(private readonly log: (event: string, data?: LogData) => void = () => {}) {}
+  /** `stats` goes only to the log file: the state arrives about 10 times a second, too often for the terminal. */
+  constructor(
+    private readonly log: (event: string, data?: LogData) => void = () => {},
+    private readonly stats: (event: string, data: LogData) => void = () => {},
+  ) {}
 
   async connect(): Promise<void> {
     this.commandSocket = await Bun.udpSocket({
@@ -49,8 +53,9 @@ export class Tello implements Drone {
       socket: {
         data: (_socket, buf) => {
           this.lastStateAt = performance.now();
-          const match = /bat:(\d+)/.exec(buf.toString());
-          if (match) this.batteryPercent = Number(match[1]);
+          const state = parseState(buf.toString());
+          if (state.bat !== undefined) this.batteryPercent = state.bat;
+          this.stats("tello-state", state);
         },
       },
     });
@@ -172,4 +177,17 @@ export class Tello implements Drone {
       this.send(command);
     });
   }
+}
+
+/**
+ * Reads a state packet such as `pitch:0;roll:0;yaw:12;vgx:0;...;tof:10;h:0;bat:87;` into numbers.
+ * Kept whole in the log so that attitude, speed and height can be checked against the real flight.
+ */
+export function parseState(text: string): Record<string, number> {
+  const state: Record<string, number> = {};
+  for (const pair of text.trim().split(";")) {
+    const [key, value] = pair.split(":");
+    if (key && value !== undefined && Number.isFinite(Number(value))) state[key] = Number(value);
+  }
+  return state;
 }
